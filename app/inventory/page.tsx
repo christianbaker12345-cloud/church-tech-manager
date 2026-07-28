@@ -1,11 +1,33 @@
 "use client";
 
 import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+
+type Equipment = {
+  id: string;
+  name: string;
+  category: string;
+  status: string;
+  location: string;
+};
 
 export default function InventoryPage() {
   const [search, setSearch] = useState("");
+  const [open, setOpen] = useState(false);
 
-  const equipment = [
+  const [assetTag, setAssetTag] = useState("");
+  const [equipmentName, setEquipmentName] = useState("");
+  const [category, setCategory] = useState("");
+  const [location, setLocation] = useState("");
+
+  const [equipment, setEquipment] = useState<Equipment[]>([
     {
       id: "A-1001",
       name: "Shure SM58",
@@ -27,14 +49,43 @@ export default function InventoryPage() {
       status: "In Repair",
       location: "Tech Shop",
     },
-  ];
+  ]);
+
+  function addEquipment() {
+    if (
+      assetTag.trim() === "" ||
+      equipmentName.trim() === "" ||
+      category.trim() === "" ||
+      location.trim() === ""
+    ) {
+      alert("Please fill out all fields.");
+      return;
+    }
+
+    const newEquipment: Equipment = {
+      id: assetTag,
+      name: equipmentName,
+      category,
+      status: "Available",
+      location,
+    };
+
+    setEquipment((prev) => [...prev, newEquipment]);
+
+    setAssetTag("");
+    setEquipmentName("");
+    setCategory("");
+    setLocation("");
+
+    setOpen(false);
+  }
 
   const filteredEquipment = equipment.filter(
     (item) =>
+      item.id.toLowerCase().includes(search.toLowerCase()) ||
       item.name.toLowerCase().includes(search.toLowerCase()) ||
       item.category.toLowerCase().includes(search.toLowerCase()) ||
-      item.location.toLowerCase().includes(search.toLowerCase()) ||
-      item.id.toLowerCase().includes(search.toLowerCase())
+      item.location.toLowerCase().includes(search.toLowerCase())
   );
 
   return (
@@ -42,9 +93,51 @@ export default function InventoryPage() {
       <div className="mb-8 flex items-center justify-between">
         <h1 className="text-3xl font-bold">Inventory</h1>
 
-        <button className="rounded-lg bg-blue-600 px-5 py-2 text-white hover:bg-blue-700">
-          + Add Equipment
-        </button>
+        <Dialog open={open} onOpenChange={setOpen}>
+          <DialogTrigger asChild>
+            <Button>+ Add Equipment</Button>
+          </DialogTrigger>
+
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Add Equipment</DialogTitle>
+            </DialogHeader>
+
+            <div className="space-y-4">
+              <input
+                className="w-full rounded-lg border p-2"
+                placeholder="Asset Tag"
+                value={assetTag}
+                onChange={(e) => setAssetTag(e.target.value)}
+              />
+
+              <input
+                className="w-full rounded-lg border p-2"
+                placeholder="Equipment Name"
+                value={equipmentName}
+                onChange={(e) => setEquipmentName(e.target.value)}
+              />
+
+              <input
+                className="w-full rounded-lg border p-2"
+                placeholder="Category"
+                value={category}
+                onChange={(e) => setCategory(e.target.value)}
+              />
+
+              <input
+                className="w-full rounded-lg border p-2"
+                placeholder="Location"
+                value={location}
+                onChange={(e) => setLocation(e.target.value)}
+              />
+
+              <Button className="w-full" onClick={addEquipment}>
+                Save Equipment
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
 
       <div className="mb-6 rounded-xl bg-white p-6 shadow">
@@ -103,10 +196,7 @@ export default function InventoryPage() {
 
             {filteredEquipment.length === 0 && (
               <tr>
-                <td
-                  colSpan={6}
-                  className="p-8 text-center text-gray-500"
-                >
+                <td colSpan={6} className="p-8 text-center text-gray-500">
                   No equipment found.
                 </td>
               </tr>
