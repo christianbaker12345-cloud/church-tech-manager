@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -7,7 +8,6 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 
 type Equipment = {
@@ -80,65 +80,68 @@ export default function InventoryPage() {
     setOpen(false);
   }
 
-  const filteredEquipment = equipment.filter(
-    (item) =>
-      item.id.toLowerCase().includes(search.toLowerCase()) ||
-      item.name.toLowerCase().includes(search.toLowerCase()) ||
-      item.category.toLowerCase().includes(search.toLowerCase()) ||
-      item.location.toLowerCase().includes(search.toLowerCase())
-  );
+  const filteredEquipment = equipment.filter((item) => {
+    const term = search.toLowerCase();
+
+    return (
+      item.id.toLowerCase().includes(term) ||
+      item.name.toLowerCase().includes(term) ||
+      item.category.toLowerCase().includes(term) ||
+      item.location.toLowerCase().includes(term)
+    );
+  });
 
   return (
     <>
       <div className="mb-8 flex items-center justify-between">
         <h1 className="text-3xl font-bold">Inventory</h1>
 
-        <Dialog open={open} onOpenChange={setOpen}>
-          <DialogTrigger asChild>
-            <Button>+ Add Equipment</Button>
-          </DialogTrigger>
-
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Add Equipment</DialogTitle>
-            </DialogHeader>
-
-            <div className="space-y-4">
-              <input
-                className="w-full rounded-lg border p-2"
-                placeholder="Asset Tag"
-                value={assetTag}
-                onChange={(e) => setAssetTag(e.target.value)}
-              />
-
-              <input
-                className="w-full rounded-lg border p-2"
-                placeholder="Equipment Name"
-                value={equipmentName}
-                onChange={(e) => setEquipmentName(e.target.value)}
-              />
-
-              <input
-                className="w-full rounded-lg border p-2"
-                placeholder="Category"
-                value={category}
-                onChange={(e) => setCategory(e.target.value)}
-              />
-
-              <input
-                className="w-full rounded-lg border p-2"
-                placeholder="Location"
-                value={location}
-                onChange={(e) => setLocation(e.target.value)}
-              />
-
-              <Button className="w-full" onClick={addEquipment}>
-                Save Equipment
-              </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
+        <Button onClick={() => setOpen(true)}>
+          + Add Equipment
+        </Button>
       </div>
+
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add Equipment</DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <input
+              className="w-full rounded-lg border p-2"
+              placeholder="Asset Tag"
+              value={assetTag}
+              onChange={(e) => setAssetTag(e.target.value)}
+            />
+
+            <input
+              className="w-full rounded-lg border p-2"
+              placeholder="Equipment Name"
+              value={equipmentName}
+              onChange={(e) => setEquipmentName(e.target.value)}
+            />
+
+            <input
+              className="w-full rounded-lg border p-2"
+              placeholder="Category"
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
+            />
+
+            <input
+              className="w-full rounded-lg border p-2"
+              placeholder="Location"
+              value={location}
+              onChange={(e) => setLocation(e.target.value)}
+            />
+
+            <Button className="w-full" onClick={addEquipment}>
+              Save Equipment
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <div className="mb-6 rounded-xl bg-white p-6 shadow">
         <input
@@ -187,9 +190,12 @@ export default function InventoryPage() {
                 <td className="p-4">{item.location}</td>
 
                 <td className="p-4">
-                  <button className="text-blue-600 hover:underline">
+                  <Link
+                    href={`/inventory/${item.id}`}
+                    className="text-blue-600 hover:underline"
+                  >
                     View
-                  </button>
+                  </Link>
                 </td>
               </tr>
             ))}
