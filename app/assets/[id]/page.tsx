@@ -765,41 +765,43 @@ export default function AssetDetailsPage() {
           </div>
 
           <div className="mt-8 flex flex-wrap gap-4">
-          <Button asChild>
-  <Link href={`/assets/${asset.id}/edit`}>
-    Edit Asset
-  </Link>
-</Button>
+  <Button asChild>
+    <Link href={`/assets/${asset.id}/edit`}>
+      Edit Asset
+    </Link>
+  </Button>
 
-            {isAvailable && (
-              <Button
-                onClick={() =>
-                  setShowCheckoutForm(true)
-                }
-              >
-                Check Out Asset
-              </Button>
-            )}
+  <Button asChild>
+    <Link href={`/assets/${asset.id}/maintenance`}>
+      Maintenance
+    </Link>
+  </Button>
 
-            {isCheckedOut && (
-              <Button
-                onClick={checkInAsset}
-                disabled={checkingIn}
-              >
-                {checkingIn
-                  ? "Checking In..."
-                  : "Check In Asset"}
-              </Button>
-            )}
+  {isAvailable && (
+    <Button
+      onClick={() => setShowCheckoutForm(true)}
+    >
+      Check Out Asset
+    </Button>
+  )}
 
-            <Button
-              variant="outline"
-              onClick={printQRCode}
-            >
-              Print QR Code
-            </Button>
-          </div>
+  {isCheckedOut && (
+    <Button
+      onClick={checkInAsset}
+      disabled={checkingIn}
+    >
+      {checkingIn
+        ? "Checking In..."
+        : "Check In Asset"}
+    </Button>
+  )}
 
+  <Button
+    onClick={printQRCode}
+  >
+    Print QR Code
+  </Button>
+</div>
           {!isAvailable && !isCheckedOut && (
             <p className="mt-4 text-sm text-gray-500">
               This asset cannot be checked out while its
