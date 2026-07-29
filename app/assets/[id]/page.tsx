@@ -7,23 +7,9 @@ import { QRCodeSVG } from "qrcode.react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/lib/supabase";
 
-type Equipment = {
-  id: string;
-  name: string;
-  quantity: number | null;
-  category: string | null;
-  status: string | null;
-  location: string | null;
-  notes: string | null;
-  checked_out_by: string | null;
-  ministry: string | null;
-  checkout_date: string | null;
-  due_date: string | null;
-};
-
 type Asset = {
   id: string;
-  equipment_id: string;
+  equipment_id: string | null;
   asset_tag: string | null;
   display_name: string | null;
   serial_number: string | null;
@@ -34,84 +20,142 @@ type Asset = {
   warranty_expires: string | null;
   notes: string | null;
   created_at: string | null;
+  checked_out_by: string | null;
+  ministry: string | null;
+  checkout_date: string | null;
+  due_date: string | null;
 };
 
-export default function EquipmentDetailsPage() {
+type Equipment = {
+  id: string;
+  name: string;
+  category: string | null;
+};
+
+type AssetCheckoutHistory = {
+  id: string;
+  asset_id: string;
+  asset_tag: string | null;
+  display_name: string | null;
+  checked_out_by: string | null;
+  ministry: string | null;
+  checkout_date: string | null;
+  due_date: string | null;
+  checkin_date: string | null;
+  status: string | null;
+  created_at: string | null;
+};
+
+export default function AssetDetailsPage() {
   const params = useParams();
 
-  const equipmentId = Array.isArray(params.id)
+  const assetId = Array.isArray(params.id)
     ? params.id[0]
     : params.id;
 
-  const [item, setItem] = useState<Equipment | null>(null);
-  const [assets, setAssets] = useState<Asset[]>([]);
+  const [asset, setAsset] = useState<Asset | null>(null);
+  const [equipment, setEquipment] =
+    useState<Equipment | null>(null);
+
+  const [history, setHistory] = useState<
+    AssetCheckoutHistory[]
+  >([]);
 
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
 
-  const [creatingAssets, setCreatingAssets] = useState(false);
-  const [checkingOut, setCheckingOut] = useState(false);
-  const [checkingIn, setCheckingIn] = useState(false);
+  const [showCheckoutForm, setShowCheckoutForm] =
+    useState(false);
 
-  const [showCheckoutForm, setShowCheckoutForm] = useState(false);
   const [checkedOutBy, setCheckedOutBy] = useState("");
   const [ministry, setMinistry] = useState("");
   const [dueDate, setDueDate] = useState("");
 
+  const [checkingOut, setCheckingOut] = useState(false);
+  const [checkingIn, setCheckingIn] = useState(false);
+
   useEffect(() => {
-    if (equipmentId) {
+    if (assetId) {
       loadPage();
     }
-  }, [equipmentId]);
+  }, [assetId]);
 
   async function loadPage() {
-    if (!equipmentId) return;
+    if (!assetId) return;
 
     setLoading(true);
     setErrorMessage("");
 
-    const equipmentResult = await supabase
-      .from("equipment")
-      .select("*")
-      .eq("id", equipmentId)
-      .maybeSingle();
-
-    if (equipmentResult.error) {
-      console.error(
-        "Equipment load error:",
-        equipmentResult.error
-      );
-
-      setErrorMessage(equipmentResult.error.message);
-      setItem(null);
-      setLoading(false);
-      return;
-    }
-
-    if (!equipmentResult.data) {
-      setErrorMessage(
-        "No equipment record was found with this ID."
-      );
-      setItem(null);
-      setLoading(false);
-      return;
-    }
-
-    const assetsResult = await supabase
+    const assetResult = await supabase
       .from("assets")
       .select("*")
-      .eq("equipment_id", equipmentId)
-      .order("created_at", { ascending: true });
+      .eq("id", assetId)
+      .maybeSingle();
 
-    if (assetsResult.error) {
-      console.error("Assets load error:", assetsResult.error);
-      setErrorMessage(assetsResult.error.message);
-      setAssets([]);
-    } else {
-      setAssets((assetsResult.data ?? []) as Asset[]);
+    if (assetResult.error) {
+      console.error("Asset load error:", assetResult.error);
+
+      setErrorMessage(assetResult.error.message);
+      setAsset(null);
+      setLoading(false);
+      return;
     }
 
-    setItem(equipmentResult.data as Equipment);
+    if (!assetResult.data) {
+      setErrorMessage(
+        "No individual asset was found with this ID."
+      );
+      setAsset(null);
+      setLoading(false);
+      return;
+    }
+
+    const loadedAsset = assetResult.data as Asset;
+
+    setAsset(loadedAsset);
+
+    if (loadedAsset.equipment_id) {
+      const equipmentResult = await supabase
+        .from("equipment")
+        .select("id,name,category")
+        .eq("id", loadedAsset.equipment_id)
+        .maybeSingle();
+
+      if (equipmentResult.error) {
+        console.error(
+          "Equipment load error:",
+          equipmentResult.error
+        );
+
+        setEquipment(null);
+      } else {
+        setEquipment(
+          (equipmentResult.data as Equipment | null) ?? null
+        );
+      }
+    } else {
+      setEquipment(null);
+    }
+
+    const historyResult = await supabase
+      .from("asset_checkout_history")
+      .select("*")
+      .eq("asset_id", assetId)
+      .order("created_at", { ascending: false });
+
+    if (historyResult.error) {
+      console.error(
+        "Asset checkout history load error:",
+        historyResult.error
+      );
+
+      setHistory([]);
+    } else {
+      setHistory(
+        (historyResult.data ?? []) as AssetCheckoutHistory[]
+      );
+    }
+
     setLoading(false);
   }
 
@@ -140,99 +184,40 @@ export default function EquipmentDetailsPage() {
     return "bg-gray-100 text-gray-700";
   }
 
-  function makeAssetPrefix(name: string) {
-    const words = name
-      .trim()
-      .toUpperCase()
-      .replace(/[^A-Z0-9\s]/g, "")
-      .split(/\s+/)
-      .filter(Boolean);
+  function formatDate(date: string | null) {
+    if (!date) return "—";
 
-    if (words.length === 0) {
-      return "ASSET";
+    const dateOnlyPattern = /^\d{4}-\d{2}-\d{2}$/;
+
+    const parsedDate = dateOnlyPattern.test(date)
+      ? new Date(`${date}T00:00:00`)
+      : new Date(date);
+
+    if (Number.isNaN(parsedDate.getTime())) {
+      return date;
     }
 
-    if (words.length === 1) {
-      return words[0].slice(0, 6);
-    }
-
-    return words
-      .slice(0, 4)
-      .map((word) => word.charAt(0))
-      .join("");
+    return parsedDate.toLocaleDateString("en-US");
   }
 
-  async function createMissingAssets() {
-    if (!item) return;
-
-    const quantity = Math.max(Number(item.quantity) || 0, 0);
-    const missingCount = quantity - assets.length;
-
-    if (missingCount <= 0) {
-      alert("All individual assets have already been created.");
-      return;
+  function formatCurrency(value: number | null) {
+    if (value === null || value === undefined) {
+      return "—";
     }
 
-    const confirmed = window.confirm(
-      `Create ${missingCount} individual ${
-        missingCount === 1 ? "asset" : "assets"
-      } for ${item.name}?`
-    );
-
-    if (!confirmed) return;
-
-    setCreatingAssets(true);
-
-    const prefix = makeAssetPrefix(item.name);
-
-    const rows = Array.from(
-      { length: missingCount },
-      (_, index) => {
-        const assetNumber = assets.length + index + 1;
-
-        const randomCode = crypto
-          .randomUUID()
-          .replaceAll("-", "")
-          .slice(0, 8)
-          .toUpperCase();
-
-        return {
-          equipment_id: item.id,
-          asset_tag: `${prefix}-${randomCode}`,
-          display_name: `${item.name} #${assetNumber}`,
-          status: "Available",
-          location: item.location,
-          notes: item.notes,
-        };
-      }
-    );
-
-    const { error } = await supabase
-      .from("assets")
-      .insert(rows);
-
-    setCreatingAssets(false);
-
-    if (error) {
-      console.error("Asset creation error:", error);
-      alert(error.message);
-      return;
-    }
-
-    alert(
-      `${missingCount} ${
-        missingCount === 1 ? "asset was" : "assets were"
-      } created successfully.`
-    );
-
-    await loadPage();
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: "USD",
+    }).format(value);
   }
 
-  async function checkOutEquipmentRecord() {
-    if (!item || !equipmentId) return;
+  async function checkOutAsset() {
+    if (!asset || !assetId) return;
 
     if (!checkedOutBy.trim()) {
-      alert("Enter the person or group checking this out.");
+      alert(
+        "Enter the person or group checking out this asset."
+      );
       return;
     }
 
@@ -241,8 +226,13 @@ export default function EquipmentDetailsPage() {
       return;
     }
 
+    const name =
+      asset.display_name ||
+      asset.asset_tag ||
+      "this asset";
+
     const confirmed = window.confirm(
-      `Check out the equipment record for ${item.name}?`
+      `Check out ${name} to ${checkedOutBy.trim()}?`
     );
 
     if (!confirmed) return;
@@ -253,8 +243,8 @@ export default function EquipmentDetailsPage() {
       .toISOString()
       .split("T")[0];
 
-    const { error: equipmentError } = await supabase
-      .from("equipment")
+    const { error: assetUpdateError } = await supabase
+      .from("assets")
       .update({
         status: "Checked Out",
         checked_out_by: checkedOutBy.trim(),
@@ -262,24 +252,25 @@ export default function EquipmentDetailsPage() {
         checkout_date: checkoutDate,
         due_date: dueDate,
       })
-      .eq("id", equipmentId);
+      .eq("id", assetId);
 
-    if (equipmentError) {
+    if (assetUpdateError) {
       console.error(
-        "Equipment checkout error:",
-        equipmentError
+        "Asset checkout update error:",
+        assetUpdateError
       );
 
-      alert(equipmentError.message);
+      alert(assetUpdateError.message);
       setCheckingOut(false);
       return;
     }
 
-    const { error: historyError } = await supabase
-      .from("checkout_history")
+    const { error: historyInsertError } = await supabase
+      .from("asset_checkout_history")
       .insert({
-        equipment_id: item.id,
-        equipment_name: item.name,
+        asset_id: asset.id,
+        asset_tag: asset.asset_tag,
+        display_name: asset.display_name,
         checked_out_by: checkedOutBy.trim(),
         ministry: ministry.trim() || null,
         checkout_date: checkoutDate,
@@ -287,17 +278,17 @@ export default function EquipmentDetailsPage() {
         status: "Checked Out",
       });
 
-    if (historyError) {
+    if (historyInsertError) {
       console.error(
-        "Equipment checkout history error:",
-        historyError
+        "Asset checkout history insert error:",
+        historyInsertError
       );
 
       alert(
-        `The equipment was checked out, but its history could not be saved:\n\n${historyError.message}`
+        `The asset was checked out, but its history could not be saved:\n\n${historyInsertError.message}`
       );
     } else {
-      alert("Equipment record checked out.");
+      alert("Asset checked out successfully.");
     }
 
     setCheckingOut(false);
@@ -309,11 +300,16 @@ export default function EquipmentDetailsPage() {
     await loadPage();
   }
 
-  async function checkInEquipmentRecord() {
-    if (!item || !equipmentId) return;
+  async function checkInAsset() {
+    if (!asset || !assetId) return;
+
+    const name =
+      asset.display_name ||
+      asset.asset_tag ||
+      "this asset";
 
     const confirmed = window.confirm(
-      `Check in the equipment record for ${item.name}?`
+      `Check in ${name}?`
     );
 
     if (!confirmed) return;
@@ -324,8 +320,8 @@ export default function EquipmentDetailsPage() {
       .toISOString()
       .split("T")[0];
 
-    const { error: equipmentError } = await supabase
-      .from("equipment")
+    const { error: assetUpdateError } = await supabase
+      .from("assets")
       .update({
         status: "Available",
         checked_out_by: null,
@@ -333,40 +329,40 @@ export default function EquipmentDetailsPage() {
         checkout_date: null,
         due_date: null,
       })
-      .eq("id", equipmentId);
+      .eq("id", assetId);
 
-    if (equipmentError) {
+    if (assetUpdateError) {
       console.error(
-        "Equipment check-in error:",
-        equipmentError
+        "Asset check-in update error:",
+        assetUpdateError
       );
 
-      alert(equipmentError.message);
+      alert(assetUpdateError.message);
       setCheckingIn(false);
       return;
     }
 
-    const { error: historyError } = await supabase
-      .from("checkout_history")
+    const { error: historyUpdateError } = await supabase
+      .from("asset_checkout_history")
       .update({
         checkin_date: checkinDate,
         status: "Returned",
       })
-      .eq("equipment_id", equipmentId)
+      .eq("asset_id", assetId)
       .eq("status", "Checked Out")
       .is("checkin_date", null);
 
-    if (historyError) {
+    if (historyUpdateError) {
       console.error(
-        "Equipment history update error:",
-        historyError
+        "Asset checkout history update error:",
+        historyUpdateError
       );
 
       alert(
-        `The equipment was checked in, but its history could not be updated:\n\n${historyError.message}`
+        `The asset was checked in, but its history could not be updated:\n\n${historyUpdateError.message}`
       );
     } else {
-      alert("Equipment record checked in.");
+      alert("Asset checked in successfully.");
     }
 
     setCheckingIn(false);
@@ -382,17 +378,17 @@ export default function EquipmentDetailsPage() {
     return (
       <div className="p-8">
         <h1 className="text-3xl font-bold">
-          Loading equipment...
+          Loading asset...
         </h1>
       </div>
     );
   }
 
-  if (!item) {
+  if (!asset) {
     return (
       <div className="p-8">
         <h1 className="text-3xl font-bold">
-          Equipment Not Found
+          Asset Not Found
         </h1>
 
         {errorMessage && (
@@ -411,35 +407,36 @@ export default function EquipmentDetailsPage() {
     );
   }
 
-  const quantity = Math.max(Number(item.quantity) || 0, 0);
+  const normalizedStatus = normalizeStatus(asset.status);
 
-  const missingAssetCount = Math.max(
-    quantity - assets.length,
-    0
-  );
+  const isAvailable =
+    normalizedStatus === "available";
 
-  const normalizedEquipmentStatus = normalizeStatus(
-    item.status
-  );
+  const isCheckedOut =
+    normalizedStatus === "checked out";
 
-  const equipmentIsAvailable =
-    normalizedEquipmentStatus === "available";
-
-  const equipmentIsCheckedOut =
-    normalizedEquipmentStatus === "checked out";
+  const displayName =
+    asset.display_name ||
+    equipment?.name ||
+    asset.asset_tag ||
+    "Unnamed Asset";
 
   const qrUrl =
     typeof window !== "undefined"
-      ? `${window.location.origin}/inventory/${item.id}`
+      ? `${window.location.origin}/assets/${asset.id}`
       : "";
 
   return (
     <div className="p-8">
       <Link
-        href="/inventory"
+        href={
+          equipment
+            ? `/inventory/${equipment.id}`
+            : "/inventory"
+        }
         className="text-blue-600 hover:underline"
       >
-        ← Back to Inventory
+        ← Back
       </Link>
 
       <div className="mt-6 grid gap-8 lg:grid-cols-3">
@@ -447,31 +444,32 @@ export default function EquipmentDetailsPage() {
           <div className="flex flex-wrap items-start justify-between gap-6">
             <div>
               <p className="text-sm font-medium uppercase tracking-wide text-gray-500">
-                Equipment Record
+                Individual Asset
               </p>
 
               <h1 className="mt-2 text-4xl font-bold">
-                {item.name}
+                {displayName}
               </h1>
 
-              <p className="mt-2 break-all text-sm text-gray-500">
-                Equipment ID: {item.id}
+              <p className="mt-2 text-gray-500">
+                Asset Tag:{" "}
+                {asset.asset_tag || "Not assigned"}
               </p>
             </div>
 
             <span
               className={`rounded-full px-4 py-2 font-semibold ${statusClasses(
-                item.status
+                asset.status
               )}`}
             >
-              {item.status || "Unknown"}
+              {asset.status || "Unknown"}
             </span>
           </div>
 
-          {equipmentIsCheckedOut && (
+          {isCheckedOut && (
             <div className="mt-8 rounded-xl border border-yellow-300 bg-yellow-50 p-6">
               <h2 className="text-xl font-bold text-yellow-900">
-                Equipment Record Checked Out
+                Currently Checked Out
               </h2>
 
               <div className="mt-4 grid gap-4 md:grid-cols-2">
@@ -481,7 +479,7 @@ export default function EquipmentDetailsPage() {
                   </p>
 
                   <p className="mt-1 font-semibold text-yellow-950">
-                    {item.checked_out_by || "—"}
+                    {asset.checked_out_by || "—"}
                   </p>
                 </div>
 
@@ -491,7 +489,7 @@ export default function EquipmentDetailsPage() {
                   </p>
 
                   <p className="mt-1 font-semibold text-yellow-950">
-                    {item.ministry || "—"}
+                    {asset.ministry || "—"}
                   </p>
                 </div>
 
@@ -501,7 +499,7 @@ export default function EquipmentDetailsPage() {
                   </p>
 
                   <p className="mt-1 font-semibold text-yellow-950">
-                    {item.checkout_date || "—"}
+                    {formatDate(asset.checkout_date)}
                   </p>
                 </div>
 
@@ -511,7 +509,7 @@ export default function EquipmentDetailsPage() {
                   </p>
 
                   <p className="mt-1 font-semibold text-yellow-950">
-                    {item.due_date || "—"}
+                    {formatDate(asset.due_date)}
                   </p>
                 </div>
               </div>
@@ -521,21 +519,31 @@ export default function EquipmentDetailsPage() {
           <div className="mt-10 grid gap-6 md:grid-cols-2">
             <div className="rounded-xl border p-5">
               <p className="text-sm text-gray-500">
-                Category
+                Equipment Type
               </p>
 
               <p className="mt-1 text-xl font-semibold">
-                {item.category || "—"}
+                {equipment?.name || "—"}
               </p>
             </div>
 
             <div className="rounded-xl border p-5">
               <p className="text-sm text-gray-500">
-                Quantity
+                Category
               </p>
 
               <p className="mt-1 text-xl font-semibold">
-                {quantity}
+                {equipment?.category || "—"}
+              </p>
+            </div>
+
+            <div className="rounded-xl border p-5">
+              <p className="text-sm text-gray-500">
+                Serial Number
+              </p>
+
+              <p className="mt-1 text-xl font-semibold">
+                {asset.serial_number || "—"}
               </p>
             </div>
 
@@ -545,17 +553,47 @@ export default function EquipmentDetailsPage() {
               </p>
 
               <p className="mt-1 text-xl font-semibold">
-                {item.location || "—"}
+                {asset.location || "—"}
               </p>
             </div>
 
             <div className="rounded-xl border p-5">
               <p className="text-sm text-gray-500">
-                Individual Assets
+                Purchase Date
               </p>
 
               <p className="mt-1 text-xl font-semibold">
-                {assets.length}
+                {formatDate(asset.purchase_date)}
+              </p>
+            </div>
+
+            <div className="rounded-xl border p-5">
+              <p className="text-sm text-gray-500">
+                Purchase Price
+              </p>
+
+              <p className="mt-1 text-xl font-semibold">
+                {formatCurrency(asset.purchase_price)}
+              </p>
+            </div>
+
+            <div className="rounded-xl border p-5">
+              <p className="text-sm text-gray-500">
+                Warranty Expires
+              </p>
+
+              <p className="mt-1 text-xl font-semibold">
+                {formatDate(asset.warranty_expires)}
+              </p>
+            </div>
+
+            <div className="rounded-xl border p-5">
+              <p className="text-sm text-gray-500">
+                Added
+              </p>
+
+              <p className="mt-1 text-xl font-semibold">
+                {formatDate(asset.created_at)}
               </p>
             </div>
           </div>
@@ -566,39 +604,33 @@ export default function EquipmentDetailsPage() {
             </h2>
 
             <p className="mt-3 text-gray-700">
-              {item.notes || "No notes available."}
+              {asset.notes || "No notes available."}
             </p>
           </div>
 
           <div className="mt-8 flex flex-wrap gap-4">
-            <Link href={`/inventory/${item.id}/edit`}>
-              <Button>Edit Equipment</Button>
-            </Link>
+            <Button disabled>
+              Edit Asset
+            </Button>
 
-            <Link href={`/inventory/${item.id}/history`}>
-              <Button variant="outline">
-                View Equipment History
-              </Button>
-            </Link>
-
-            {equipmentIsAvailable && (
+            {isAvailable && (
               <Button
                 onClick={() =>
                   setShowCheckoutForm(true)
                 }
               >
-                Check Out Equipment Record
+                Check Out Asset
               </Button>
             )}
 
-            {equipmentIsCheckedOut && (
+            {isCheckedOut && (
               <Button
-                onClick={checkInEquipmentRecord}
+                onClick={checkInAsset}
                 disabled={checkingIn}
               >
                 {checkingIn
                   ? "Checking In..."
-                  : "Check In Equipment Record"}
+                  : "Check In Asset"}
               </Button>
             )}
 
@@ -610,21 +642,23 @@ export default function EquipmentDetailsPage() {
             </Button>
           </div>
 
-          <p className="mt-4 text-sm text-gray-500">
-            Individual assets have their own separate checkout
-            buttons on their asset pages.
-          </p>
+          {!isAvailable && !isCheckedOut && (
+            <p className="mt-4 text-sm text-gray-500">
+              This asset cannot be checked out while its
+              status is {asset.status || "Unknown"}.
+            </p>
+          )}
 
-          {showCheckoutForm && equipmentIsAvailable && (
+          {showCheckoutForm && isAvailable && (
             <div className="mt-8 rounded-xl border bg-gray-50 p-6">
               <div className="flex items-center justify-between gap-4">
                 <div>
                   <h2 className="text-2xl font-bold">
-                    Check Out Equipment Record
+                    Check Out Asset
                   </h2>
 
                   <p className="mt-1 text-gray-500">
-                    {item.name}
+                    {displayName}
                   </p>
                 </div>
 
@@ -648,7 +682,7 @@ export default function EquipmentDetailsPage() {
                   <input
                     type="text"
                     className="w-full rounded-lg border bg-white p-3"
-                    placeholder="Who is borrowing it?"
+                    placeholder="Who is borrowing this asset?"
                     value={checkedOutBy}
                     onChange={(event) =>
                       setCheckedOutBy(event.target.value)
@@ -688,7 +722,7 @@ export default function EquipmentDetailsPage() {
                 </div>
 
                 <Button
-                  onClick={checkOutEquipmentRecord}
+                  onClick={checkOutAsset}
                   disabled={checkingOut}
                 >
                   {checkingOut
@@ -702,7 +736,7 @@ export default function EquipmentDetailsPage() {
 
         <div className="rounded-2xl bg-white p-8 text-center shadow">
           <h2 className="text-2xl font-bold">
-            Equipment QR Code
+            Asset QR Code
           </h2>
 
           <div className="mt-6 flex justify-center">
@@ -718,57 +752,29 @@ export default function EquipmentDetailsPage() {
           </p>
 
           <p className="mt-4 text-sm text-gray-400">
-            This QR code opens the main equipment record.
+            Scan this code to open this individual asset.
           </p>
         </div>
       </div>
 
       <div className="mt-8 rounded-2xl bg-white p-8 shadow">
-        <div className="flex flex-wrap items-center justify-between gap-5">
-          <div>
-            <h2 className="text-3xl font-bold">
-              Individual Assets
-            </h2>
+        <h2 className="text-3xl font-bold">
+          Checkout History
+        </h2>
 
-            <p className="mt-2 text-gray-500">
-              {assets.length} of {quantity} assets created
-            </p>
-          </div>
+        <p className="mt-2 text-gray-500">
+          Checkout activity for this individual asset.
+        </p>
 
-          <Button
-            onClick={createMissingAssets}
-            disabled={
-              creatingAssets || missingAssetCount === 0
-            }
-          >
-            {creatingAssets
-              ? "Creating Assets..."
-              : missingAssetCount > 0
-                ? `Create ${missingAssetCount} Missing ${
-                    missingAssetCount === 1
-                      ? "Asset"
-                      : "Assets"
-                  }`
-                : "All Assets Created"}
-          </Button>
-        </div>
-
-        {assets.length > quantity && (
-          <div className="mt-6 rounded-lg border border-yellow-300 bg-yellow-50 p-4 text-yellow-800">
-            There are more individual assets than the equipment
-            quantity.
-          </div>
-        )}
-
-        {assets.length === 0 ? (
+        {history.length === 0 ? (
           <div className="mt-8 rounded-xl border border-dashed p-10 text-center">
             <h3 className="text-xl font-semibold">
-              No individual assets yet
+              No checkout history
             </h3>
 
             <p className="mt-2 text-gray-500">
-              Create individual assets so every physical item can
-              have its own QR code, status, and checkout history.
+              Activity will appear here after this asset is
+              checked out.
             </p>
           </div>
         ) : (
@@ -777,72 +783,68 @@ export default function EquipmentDetailsPage() {
               <thead className="bg-gray-100">
                 <tr>
                   <th className="p-4 text-left">
-                    Asset
+                    Borrower
                   </th>
 
                   <th className="p-4 text-left">
-                    Asset Tag
+                    Ministry
                   </th>
 
                   <th className="p-4 text-left">
-                    Serial Number
+                    Checkout Date
+                  </th>
+
+                  <th className="p-4 text-left">
+                    Due Date
+                  </th>
+
+                  <th className="p-4 text-left">
+                    Check-In Date
                   </th>
 
                   <th className="p-4 text-left">
                     Status
                   </th>
-
-                  <th className="p-4 text-left">
-                    Location
-                  </th>
-
-                  <th className="p-4 text-left">
-                    Action
-                  </th>
                 </tr>
               </thead>
 
               <tbody>
-                {assets.map((asset) => (
+                {history.map((record) => (
                   <tr
-                    key={asset.id}
-                    className="border-t hover:bg-gray-50"
+                    key={record.id}
+                    className="border-t"
                   >
-                    <td className="p-4 font-semibold">
-                      {asset.display_name ||
-                        asset.asset_tag ||
-                        "Unnamed Asset"}
+                    <td className="p-4 font-medium">
+                      {record.checked_out_by || "—"}
                     </td>
 
                     <td className="p-4">
-                      {asset.asset_tag || "—"}
+                      {record.ministry || "—"}
                     </td>
 
                     <td className="p-4">
-                      {asset.serial_number || "—"}
+                      {formatDate(record.checkout_date)}
+                    </td>
+
+                    <td className="p-4">
+                      {formatDate(record.due_date)}
+                    </td>
+
+                    <td className="p-4">
+                      {formatDate(record.checkin_date)}
                     </td>
 
                     <td className="p-4">
                       <span
-                        className={`rounded-full px-3 py-1 text-sm font-medium ${statusClasses(
-                          asset.status
-                        )}`}
+                        className={`rounded-full px-3 py-1 text-sm font-medium ${
+                          normalizeStatus(record.status) ===
+                          "returned"
+                            ? "bg-green-100 text-green-700"
+                            : "bg-yellow-100 text-yellow-700"
+                        }`}
                       >
-                        {asset.status || "Unknown"}
+                        {record.status || "Unknown"}
                       </span>
-                    </td>
-
-                    <td className="p-4">
-                      {asset.location || "—"}
-                    </td>
-
-                    <td className="p-4">
-                      <Link
-                        href={`/assets/${asset.id}`}
-                        className="font-medium text-blue-600 hover:underline"
-                      >
-                        View Asset
-                      </Link>
                     </td>
                   </tr>
                 ))}
