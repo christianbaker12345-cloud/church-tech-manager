@@ -609,9 +609,11 @@ export default function AssetDetailsPage() {
           </div>
 
           <div className="mt-8 flex flex-wrap gap-4">
-            <Button disabled>
-              Edit Asset
-            </Button>
+          <Button asChild>
+  <Link href={`/assets/${asset.id}/edit`}>
+    Edit Asset
+  </Link>
+</Button>
 
             {isAvailable && (
               <Button
