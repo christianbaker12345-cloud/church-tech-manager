@@ -46,6 +46,14 @@ type AssetCheckoutHistory = {
   created_at: string | null;
 };
 
+type AssetPhoto = {
+  id: string;
+  asset_id: string;
+  image_url: string;
+  caption: string | null;
+  created_at: string | null;
+};
+
 export default function AssetDetailsPage() {
   const params = useParams();
 
@@ -73,6 +81,12 @@ export default function AssetDetailsPage() {
 
   const [checkingOut, setCheckingOut] = useState(false);
   const [checkingIn, setCheckingIn] = useState(false);
+
+  const [photos, setPhotos] = useState<AssetPhoto[]>([]);
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [photoCaption, setPhotoCaption] = useState("");
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [deletingPhotoId, setDeletingPhotoId] = useState<string | null>(null);
 
   useEffect(() => {
     if (assetId) {
@@ -156,6 +170,19 @@ export default function AssetDetailsPage() {
       );
     }
 
+    const photosResult = await supabase
+      .from("asset_photos")
+      .select("*")
+      .eq("asset_id", assetId)
+      .order("created_at", { ascending: false });
+
+    if (photosResult.error) {
+      console.error("Asset photos load error:", photosResult.error);
+      setPhotos([]);
+    } else {
+      setPhotos((photosResult.data ?? []) as AssetPhoto[]);
+    }
+
     setLoading(false);
   }
 
@@ -209,6 +236,135 @@ export default function AssetDetailsPage() {
       style: "currency",
       currency: "USD",
     }).format(value);
+  }
+
+  async function uploadAssetPhoto() {
+    if (!asset || !assetId || !photoFile) {
+      alert("Choose a photo first.");
+      return;
+    }
+
+    if (!photoFile.type.startsWith("image/")) {
+      alert("Please choose an image file.");
+      return;
+    }
+
+    const maxFileSize = 10 * 1024 * 1024;
+
+    if (photoFile.size > maxFileSize) {
+      alert("Please choose an image smaller than 10 MB.");
+      return;
+    }
+
+    setUploadingPhoto(true);
+
+    const extension = photoFile.name.split(".").pop()?.toLowerCase() || "jpg";
+    const storagePath = `${assetId}/${crypto.randomUUID()}.${extension}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from("asset-photos")
+      .upload(storagePath, photoFile, {
+        cacheControl: "3600",
+        upsert: false,
+      });
+
+    if (uploadError) {
+      console.error("Asset photo upload error:", uploadError);
+      alert(uploadError.message);
+      setUploadingPhoto(false);
+      return;
+    }
+
+    const { data: publicUrlData } = supabase.storage
+      .from("asset-photos")
+      .getPublicUrl(storagePath);
+
+    const { error: photoInsertError } = await supabase
+      .from("asset_photos")
+      .insert({
+        asset_id: asset.id,
+        image_url: publicUrlData.publicUrl,
+        caption: photoCaption.trim() || null,
+      });
+
+    if (photoInsertError) {
+      console.error("Asset photo record error:", photoInsertError);
+
+      await supabase.storage
+        .from("asset-photos")
+        .remove([storagePath]);
+
+      alert(photoInsertError.message);
+      setUploadingPhoto(false);
+      return;
+    }
+
+    setPhotoFile(null);
+    setPhotoCaption("");
+
+    const fileInput = document.getElementById(
+      "asset-photo-input"
+    ) as HTMLInputElement | null;
+
+    if (fileInput) {
+      fileInput.value = "";
+    }
+
+    setUploadingPhoto(false);
+    await loadPage();
+  }
+
+  async function deleteAssetPhoto(photo: AssetPhoto) {
+    const confirmed = window.confirm(
+      "Delete this photo permanently?"
+    );
+
+    if (!confirmed) return;
+
+    setDeletingPhotoId(photo.id);
+
+    const storageMarker =
+      "/storage/v1/object/public/asset-photos/";
+    const markerIndex = photo.image_url.indexOf(storageMarker);
+
+    if (markerIndex !== -1) {
+      const encodedPath = photo.image_url.slice(
+        markerIndex + storageMarker.length
+      );
+      const storagePath = decodeURIComponent(encodedPath);
+
+      const { error: storageDeleteError } = await supabase.storage
+        .from("asset-photos")
+        .remove([storagePath]);
+
+      if (storageDeleteError) {
+        console.error(
+          "Asset photo storage delete error:",
+          storageDeleteError
+        );
+        alert(storageDeleteError.message);
+        setDeletingPhotoId(null);
+        return;
+      }
+    }
+
+    const { error: recordDeleteError } = await supabase
+      .from("asset_photos")
+      .delete()
+      .eq("id", photo.id);
+
+    if (recordDeleteError) {
+      console.error(
+        "Asset photo record delete error:",
+        recordDeleteError
+      );
+      alert(recordDeleteError.message);
+      setDeletingPhotoId(null);
+      return;
+    }
+
+    setDeletingPhotoId(null);
+    await loadPage();
   }
 
   async function checkOutAsset() {
@@ -757,6 +913,120 @@ export default function AssetDetailsPage() {
             Scan this code to open this individual asset.
           </p>
         </div>
+      </div>
+
+      <div className="mt-8 rounded-2xl bg-white p-8 shadow">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <h2 className="text-3xl font-bold">Asset Photos</h2>
+
+            <p className="mt-2 text-gray-500">
+              Add identification, serial-number, damage, and receipt photos.
+            </p>
+          </div>
+
+          <span className="rounded-full bg-gray-100 px-3 py-1 text-sm font-medium text-gray-700">
+            {photos.length} {photos.length === 1 ? "photo" : "photos"}
+          </span>
+        </div>
+
+        <div className="mt-8 rounded-xl border bg-gray-50 p-6">
+          <div className="grid gap-5 md:grid-cols-2">
+            <div>
+              <label className="mb-2 block font-medium">Photo</label>
+
+              <input
+                id="asset-photo-input"
+                type="file"
+                accept="image/*"
+                className="block w-full rounded-lg border bg-white p-3 text-sm"
+                onChange={(event) =>
+                  setPhotoFile(event.target.files?.[0] ?? null)
+                }
+              />
+
+              <p className="mt-2 text-sm text-gray-500">
+                JPG, PNG, HEIC, or another image format up to 10 MB.
+              </p>
+            </div>
+
+            <div>
+              <label className="mb-2 block font-medium">Caption</label>
+
+              <input
+                type="text"
+                value={photoCaption}
+                onChange={(event) =>
+                  setPhotoCaption(event.target.value)
+                }
+                className="w-full rounded-lg border bg-white p-3"
+                placeholder="Front, serial number, damage, receipt..."
+              />
+            </div>
+          </div>
+
+          <Button
+            className="mt-5"
+            onClick={uploadAssetPhoto}
+            disabled={!photoFile || uploadingPhoto}
+          >
+            {uploadingPhoto ? "Uploading Photo..." : "Upload Photo"}
+          </Button>
+        </div>
+
+        {photos.length === 0 ? (
+          <div className="mt-8 rounded-xl border border-dashed p-10 text-center">
+            <h3 className="text-xl font-semibold">No photos yet</h3>
+
+            <p className="mt-2 text-gray-500">
+              Upload the first photo for this individual asset.
+            </p>
+          </div>
+        ) : (
+          <div className="mt-8 grid gap-6 sm:grid-cols-2 xl:grid-cols-3">
+            {photos.map((photo) => (
+              <div
+                key={photo.id}
+                className="overflow-hidden rounded-xl border bg-white"
+              >
+                <a
+                  href={photo.image_url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="block"
+                >
+                  <img
+                    src={photo.image_url}
+                    alt={photo.caption || displayName}
+                    className="h-64 w-full object-cover"
+                  />
+                </a>
+
+                <div className="p-4">
+                  <p className="font-medium">
+                    {photo.caption || "Asset photo"}
+                  </p>
+
+                  <p className="mt-1 text-sm text-gray-500">
+                    Added {formatDate(photo.created_at)}
+                  </p>
+
+                  <Button
+                    className="mt-4"
+                    type="button"
+                    variant="outline"
+                    onClick={() => deleteAssetPhoto(photo)}
+                    disabled={deletingPhotoId === photo.id}
+                  >
+                    {deletingPhotoId === photo.id
+                      ? "Deleting..."
+                      : "Delete Photo"}
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="mt-8 rounded-2xl bg-white p-8 shadow">
