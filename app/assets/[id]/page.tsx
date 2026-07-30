@@ -1,5 +1,6 @@
 "use client";
 
+import AssetHeader from "@/components/assets/AssetHeader";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
@@ -597,30 +598,12 @@ export default function AssetDetailsPage() {
 
       <div className="mt-6 grid gap-8 lg:grid-cols-3">
         <div className="rounded-2xl bg-white p-8 shadow lg:col-span-2">
-          <div className="flex flex-wrap items-start justify-between gap-6">
-            <div>
-              <p className="text-sm font-medium uppercase tracking-wide text-gray-500">
-                Individual Asset
-              </p>
-
-              <h1 className="mt-2 text-4xl font-bold">
-                {displayName}
-              </h1>
-
-              <p className="mt-2 text-gray-500">
-                Asset Tag:{" "}
-                {asset.asset_tag || "Not assigned"}
-              </p>
-            </div>
-
-            <span
-              className={`rounded-full px-4 py-2 font-semibold ${statusClasses(
-                asset.status
-              )}`}
-            >
-              {asset.status || "Unknown"}
-            </span>
-          </div>
+          <AssetHeader
+            title={displayName}
+            assetTag={asset.asset_tag}
+            status={asset.status}
+            statusClasses={statusClasses}
+          />
 
           {isCheckedOut && (
             <div className="mt-8 rounded-xl border border-yellow-300 bg-yellow-50 p-6">
