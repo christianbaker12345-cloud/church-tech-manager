@@ -4,6 +4,10 @@ import AssetHeader from "@/components/assets/AssetHeader";
 import AssetActionBar from "@/components/assets/AssetActionBar";
 import AssetInformation from "@/components/assets/AssetInformation";
 import AssetQRCode from "@/components/assets/AssetQRCode";
+import AssetPhotos from "@/components/assets/AssetPhotos";
+import CheckoutHistory, {
+  type AssetCheckoutHistory,
+} from "@/components/assets/CheckoutHistory";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
@@ -35,19 +39,6 @@ type Equipment = {
   category: string | null;
 };
 
-type AssetCheckoutHistory = {
-  id: string;
-  asset_id: string;
-  asset_tag: string | null;
-  display_name: string | null;
-  checked_out_by: string | null;
-  ministry: string | null;
-  checkout_date: string | null;
-  due_date: string | null;
-  checkin_date: string | null;
-  status: string | null;
-  created_at: string | null;
-};
 
 type AssetPhoto = {
   id: string;
@@ -720,216 +711,25 @@ export default function AssetDetailsPage() {
         <AssetQRCode qrUrl={qrUrl} />
       </div>
 
-      <div className="mt-8 rounded-2xl bg-white p-8 shadow">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <h2 className="text-3xl font-bold">Asset Photos</h2>
+      <AssetPhotos
+        photos={photos}
+        photoCaption={photoCaption}
+        hasSelectedPhoto={photoFile !== null}
+        uploadingPhoto={uploadingPhoto}
+        deletingPhotoId={deletingPhotoId}
+        displayName={displayName}
+        formatDate={formatDate}
+        onPhotoFileChange={setPhotoFile}
+        onPhotoCaptionChange={setPhotoCaption}
+        onUploadPhoto={uploadAssetPhoto}
+        onDeletePhoto={deleteAssetPhoto}
+      />
 
-            <p className="mt-2 text-gray-500">
-              Add identification, serial-number, damage, and receipt photos.
-            </p>
-          </div>
-
-          <span className="rounded-full bg-gray-100 px-3 py-1 text-sm font-medium text-gray-700">
-            {photos.length} {photos.length === 1 ? "photo" : "photos"}
-          </span>
-        </div>
-
-        <div className="mt-8 rounded-xl border bg-gray-50 p-6">
-          <div className="grid gap-5 md:grid-cols-2">
-            <div>
-              <label className="mb-2 block font-medium">Photo</label>
-
-              <input
-                id="asset-photo-input"
-                type="file"
-                accept="image/*"
-                className="block w-full rounded-lg border bg-white p-3 text-sm"
-                onChange={(event) =>
-                  setPhotoFile(event.target.files?.[0] ?? null)
-                }
-              />
-
-              <p className="mt-2 text-sm text-gray-500">
-                JPG, PNG, HEIC, or another image format up to 10 MB.
-              </p>
-            </div>
-
-            <div>
-              <label className="mb-2 block font-medium">Caption</label>
-
-              <input
-                type="text"
-                value={photoCaption}
-                onChange={(event) =>
-                  setPhotoCaption(event.target.value)
-                }
-                className="w-full rounded-lg border bg-white p-3"
-                placeholder="Front, serial number, damage, receipt..."
-              />
-            </div>
-          </div>
-
-          <Button
-            className="mt-5"
-            onClick={uploadAssetPhoto}
-            disabled={!photoFile || uploadingPhoto}
-          >
-            {uploadingPhoto ? "Uploading Photo..." : "Upload Photo"}
-          </Button>
-        </div>
-
-        {photos.length === 0 ? (
-          <div className="mt-8 rounded-xl border border-dashed p-10 text-center">
-            <h3 className="text-xl font-semibold">No photos yet</h3>
-
-            <p className="mt-2 text-gray-500">
-              Upload the first photo for this individual asset.
-            </p>
-          </div>
-        ) : (
-          <div className="mt-8 grid gap-6 sm:grid-cols-2 xl:grid-cols-3">
-            {photos.map((photo) => (
-              <div
-                key={photo.id}
-                className="overflow-hidden rounded-xl border bg-white"
-              >
-                <a
-                  href={photo.image_url}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="block"
-                >
-                  <img
-                    src={photo.image_url}
-                    alt={photo.caption || displayName}
-                    className="h-64 w-full object-cover"
-                  />
-                </a>
-
-                <div className="p-4">
-                  <p className="font-medium">
-                    {photo.caption || "Asset photo"}
-                  </p>
-
-                  <p className="mt-1 text-sm text-gray-500">
-                    Added {formatDate(photo.created_at)}
-                  </p>
-
-                  <Button
-                    className="mt-4"
-                    type="button"
-                    variant="outline"
-                    onClick={() => deleteAssetPhoto(photo)}
-                    disabled={deletingPhotoId === photo.id}
-                  >
-                    {deletingPhotoId === photo.id
-                      ? "Deleting..."
-                      : "Delete Photo"}
-                  </Button>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      <div className="mt-8 rounded-2xl bg-white p-8 shadow">
-        <h2 className="text-3xl font-bold">
-          Checkout History
-        </h2>
-
-        <p className="mt-2 text-gray-500">
-          Checkout activity for this individual asset.
-        </p>
-
-        {history.length === 0 ? (
-          <div className="mt-8 rounded-xl border border-dashed p-10 text-center">
-            <h3 className="text-xl font-semibold">
-              No checkout history
-            </h3>
-
-            <p className="mt-2 text-gray-500">
-              Activity will appear here after this asset is
-              checked out.
-            </p>
-          </div>
-        ) : (
-          <div className="mt-8 overflow-x-auto rounded-xl border">
-            <table className="w-full min-w-[850px]">
-              <thead className="bg-gray-100">
-                <tr>
-                  <th className="p-4 text-left">
-                    Borrower
-                  </th>
-
-                  <th className="p-4 text-left">
-                    Ministry
-                  </th>
-
-                  <th className="p-4 text-left">
-                    Checkout Date
-                  </th>
-
-                  <th className="p-4 text-left">
-                    Due Date
-                  </th>
-
-                  <th className="p-4 text-left">
-                    Check-In Date
-                  </th>
-
-                  <th className="p-4 text-left">
-                    Status
-                  </th>
-                </tr>
-              </thead>
-
-              <tbody>
-                {history.map((record) => (
-                  <tr
-                    key={record.id}
-                    className="border-t"
-                  >
-                    <td className="p-4 font-medium">
-                      {record.checked_out_by || "—"}
-                    </td>
-
-                    <td className="p-4">
-                      {record.ministry || "—"}
-                    </td>
-
-                    <td className="p-4">
-                      {formatDate(record.checkout_date)}
-                    </td>
-
-                    <td className="p-4">
-                      {formatDate(record.due_date)}
-                    </td>
-
-                    <td className="p-4">
-                      {formatDate(record.checkin_date)}
-                    </td>
-
-                    <td className="p-4">
-                      <span
-                        className={`rounded-full px-3 py-1 text-sm font-medium ${
-                          normalizeStatus(record.status) ===
-                          "returned"
-                            ? "bg-green-100 text-green-700"
-                            : "bg-yellow-100 text-yellow-700"
-                        }`}
-                      >
-                        {record.status || "Unknown"}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
+      <CheckoutHistory
+        history={history}
+        formatDate={formatDate}
+        normalizeStatus={normalizeStatus}
+      />
     </div>
   );
 }
