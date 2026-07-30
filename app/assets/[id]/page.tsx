@@ -1,10 +1,12 @@
 "use client";
 
 import AssetHeader from "@/components/assets/AssetHeader";
+import AssetActionBar from "@/components/assets/AssetActionBar";
+import AssetInformation from "@/components/assets/AssetInformation";
+import AssetQRCode from "@/components/assets/AssetQRCode";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import { QRCodeSVG } from "qrcode.react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/lib/supabase";
 
@@ -605,186 +607,24 @@ export default function AssetDetailsPage() {
             statusClasses={statusClasses}
           />
 
-          {isCheckedOut && (
-            <div className="mt-8 rounded-xl border border-yellow-300 bg-yellow-50 p-6">
-              <h2 className="text-xl font-bold text-yellow-900">
-                Currently Checked Out
-              </h2>
+          <AssetInformation
+            asset={asset}
+            equipment={equipment}
+            isCheckedOut={isCheckedOut}
+            formatDate={formatDate}
+            formatCurrency={formatCurrency}
+          />
 
-              <div className="mt-4 grid gap-4 md:grid-cols-2">
-                <div>
-                  <p className="text-sm text-yellow-700">
-                    Checked Out By
-                  </p>
+          <AssetActionBar
+            assetId={asset.id}
+            isAvailable={isAvailable}
+            isCheckedOut={isCheckedOut}
+            checkingIn={checkingIn}
+            onShowCheckoutForm={() => setShowCheckoutForm(true)}
+            onCheckIn={checkInAsset}
+            onPrintQRCode={printQRCode}
+          />
 
-                  <p className="mt-1 font-semibold text-yellow-950">
-                    {asset.checked_out_by || "—"}
-                  </p>
-                </div>
-
-                <div>
-                  <p className="text-sm text-yellow-700">
-                    Ministry
-                  </p>
-
-                  <p className="mt-1 font-semibold text-yellow-950">
-                    {asset.ministry || "—"}
-                  </p>
-                </div>
-
-                <div>
-                  <p className="text-sm text-yellow-700">
-                    Checkout Date
-                  </p>
-
-                  <p className="mt-1 font-semibold text-yellow-950">
-                    {formatDate(asset.checkout_date)}
-                  </p>
-                </div>
-
-                <div>
-                  <p className="text-sm text-yellow-700">
-                    Due Date
-                  </p>
-
-                  <p className="mt-1 font-semibold text-yellow-950">
-                    {formatDate(asset.due_date)}
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
-
-          <div className="mt-10 grid gap-6 md:grid-cols-2">
-            <div className="rounded-xl border p-5">
-              <p className="text-sm text-gray-500">
-                Equipment Type
-              </p>
-
-              <p className="mt-1 text-xl font-semibold">
-                {equipment?.name || "—"}
-              </p>
-            </div>
-
-            <div className="rounded-xl border p-5">
-              <p className="text-sm text-gray-500">
-                Category
-              </p>
-
-              <p className="mt-1 text-xl font-semibold">
-                {equipment?.category || "—"}
-              </p>
-            </div>
-
-            <div className="rounded-xl border p-5">
-              <p className="text-sm text-gray-500">
-                Serial Number
-              </p>
-
-              <p className="mt-1 text-xl font-semibold">
-                {asset.serial_number || "—"}
-              </p>
-            </div>
-
-            <div className="rounded-xl border p-5">
-              <p className="text-sm text-gray-500">
-                Location
-              </p>
-
-              <p className="mt-1 text-xl font-semibold">
-                {asset.location || "—"}
-              </p>
-            </div>
-
-            <div className="rounded-xl border p-5">
-              <p className="text-sm text-gray-500">
-                Purchase Date
-              </p>
-
-              <p className="mt-1 text-xl font-semibold">
-                {formatDate(asset.purchase_date)}
-              </p>
-            </div>
-
-            <div className="rounded-xl border p-5">
-              <p className="text-sm text-gray-500">
-                Purchase Price
-              </p>
-
-              <p className="mt-1 text-xl font-semibold">
-                {formatCurrency(asset.purchase_price)}
-              </p>
-            </div>
-
-            <div className="rounded-xl border p-5">
-              <p className="text-sm text-gray-500">
-                Warranty Expires
-              </p>
-
-              <p className="mt-1 text-xl font-semibold">
-                {formatDate(asset.warranty_expires)}
-              </p>
-            </div>
-
-            <div className="rounded-xl border p-5">
-              <p className="text-sm text-gray-500">
-                Added
-              </p>
-
-              <p className="mt-1 text-xl font-semibold">
-                {formatDate(asset.created_at)}
-              </p>
-            </div>
-          </div>
-
-          <div className="mt-8 rounded-xl border p-6">
-            <h2 className="text-xl font-bold">
-              Notes
-            </h2>
-
-            <p className="mt-3 text-gray-700">
-              {asset.notes || "No notes available."}
-            </p>
-          </div>
-
-          <div className="mt-8 flex flex-wrap gap-4">
-  <Button asChild>
-    <Link href={`/assets/${asset.id}/edit`}>
-      Edit Asset
-    </Link>
-  </Button>
-
-  <Button asChild>
-    <Link href={`/assets/${asset.id}/maintenance`}>
-      Maintenance
-    </Link>
-  </Button>
-
-  {isAvailable && (
-    <Button
-      onClick={() => setShowCheckoutForm(true)}
-    >
-      Check Out Asset
-    </Button>
-  )}
-
-  {isCheckedOut && (
-    <Button
-      onClick={checkInAsset}
-      disabled={checkingIn}
-    >
-      {checkingIn
-        ? "Checking In..."
-        : "Check In Asset"}
-    </Button>
-  )}
-
-  <Button
-    onClick={printQRCode}
-  >
-    Print QR Code
-  </Button>
-</div>
           {!isAvailable && !isCheckedOut && (
             <p className="mt-4 text-sm text-gray-500">
               This asset cannot be checked out while its
@@ -877,27 +717,7 @@ export default function AssetDetailsPage() {
           )}
         </div>
 
-        <div className="rounded-2xl bg-white p-8 text-center shadow">
-          <h2 className="text-2xl font-bold">
-            Asset QR Code
-          </h2>
-
-          <div className="mt-6 flex justify-center">
-            <QRCodeSVG
-              value={qrUrl}
-              size={220}
-              includeMargin
-            />
-          </div>
-
-          <p className="mt-6 break-all text-sm text-gray-500">
-            {qrUrl}
-          </p>
-
-          <p className="mt-4 text-sm text-gray-400">
-            Scan this code to open this individual asset.
-          </p>
-        </div>
+        <AssetQRCode qrUrl={qrUrl} />
       </div>
 
       <div className="mt-8 rounded-2xl bg-white p-8 shadow">
