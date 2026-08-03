@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import CriticalRepairs from "@/components/dashboard/CriticalRepairs";
 import SundayReadiness from "@/components/dashboard/SundayReadiness";
 import UpcomingMaintenance, {
@@ -32,6 +32,23 @@ const emptyStats: DashboardStats = {
   overdue: 0,
   criticalRepairs: 0,
 };
+
+function getGreeting() {
+  const hour = new Date().getHours();
+
+  if (hour < 12) return "Good morning";
+  if (hour < 18) return "Good afternoon";
+  return "Good evening";
+}
+
+function formatToday() {
+  return new Intl.DateTimeFormat("en-US", {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  }).format(new Date());
+}
 
 export default function DashboardPage() {
   const [stats, setStats] = useState<DashboardStats>(emptyStats);
@@ -191,52 +208,114 @@ export default function DashboardPage() {
     )
   );
 
-  const cards = [
+  const statCards = useMemo(
+    () => [
+      {
+        label: "Total Equipment",
+        value: stats.total,
+        description: "Tracked individual items",
+        accentClassName: "bg-slate-900",
+        valueClassName: "text-slate-950",
+      },
+      {
+        label: "Available",
+        value: stats.available,
+        description: "Ready for regular use",
+        accentClassName: "bg-emerald-500",
+        valueClassName: "text-emerald-700",
+      },
+      {
+        label: "Transferred",
+        value: stats.transferred,
+        description: "Temporarily assigned elsewhere",
+        accentClassName: "bg-amber-500",
+        valueClassName: "text-amber-700",
+      },
+      {
+        label: "Maintenance",
+        value: stats.maintenance,
+        description: "Unavailable for service",
+        accentClassName: "bg-rose-500",
+        valueClassName: "text-rose-700",
+      },
+      {
+        label: "Overdue Return",
+        value: stats.overdue,
+        description: "Past the expected return date",
+        accentClassName: "bg-orange-500",
+        valueClassName: "text-orange-700",
+      },
+    ],
+    [stats]
+  );
+
+  const quickActions = [
     {
-      label: "Total Equipment",
-      value: stats.total,
-      valueClassName: "text-gray-900",
+      href: "/inventory/new",
+      title: "Add Equipment",
+      description: "Create a new equipment record.",
+      icon: "＋",
     },
     {
-      label: "Available",
-      value: stats.available,
-      valueClassName: "text-green-600",
+      href: "/inventory",
+      title: "View Equipment",
+      description: "Search and manage the full equipment list.",
+      icon: "📦",
     },
     {
-      label: "Transferred",
-      value: stats.transferred,
-      valueClassName: "text-yellow-600",
+      href: "/maintenance",
+      title: "Maintenance",
+      description: "Review repairs and upcoming service.",
+      icon: "🔧",
     },
     {
-      label: "Maintenance",
-      value: stats.maintenance,
-      valueClassName: "text-red-600",
+      href: "/transfers",
+      title: "Transfers",
+      description: "Track equipment moved to another space or team.",
+      icon: "🚚",
     },
     {
-      label: "Overdue Return",
-      value: stats.overdue,
-      valueClassName: "text-orange-600",
+      href: "/tools/export",
+      title: "Export Center",
+      description: "Download operational data as CSV files.",
+      icon: "📤",
     },
   ];
 
   return (
-    <div>
-      <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
+    <div className="space-y-10">
+      <header className="flex flex-wrap items-end justify-between gap-6">
         <div>
-          <h1 className="text-4xl font-bold">Dashboard</h1>
+          <p className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">
+            Operations Dashboard
+          </p>
 
-          <p className="mt-2 text-gray-500">
-            Welcome to Church Tech Manager
+          <h1 className="mt-3 text-4xl font-bold tracking-tight text-slate-950 md:text-5xl">
+            {getGreeting()}, Christian
+          </h1>
+
+          <p className="mt-3 text-base text-slate-500">
+            {formatToday()}
           </p>
         </div>
 
-        <Link href="/inventory/new">
-          <Button>Add Equipment</Button>
-        </Link>
-      </div>
+        <div className="flex flex-wrap gap-3">
+          <Button
+            variant="outline"
+            onClick={loadDashboard}
+            disabled={loading}
+          >
+            {loading ? "Refreshing..." : "Refresh"}
+          </Button>
+
+          <Link href="/inventory/new">
+            <Button>Add Equipment</Button>
+          </Link>
+        </div>
+      </header>
 
       {errorMessage && (
-        <div className="mb-6 rounded-xl border border-red-200 bg-red-50 p-4 text-red-700">
+        <section className="rounded-2xl border border-rose-200 bg-rose-50 p-5 text-rose-800 shadow-sm">
           <p className="font-semibold">
             Some dashboard information could not be loaded.
           </p>
@@ -250,82 +329,124 @@ export default function DashboardPage() {
           >
             Try Again
           </Button>
-        </div>
+        </section>
       )}
 
-      <SundayReadiness
-        score={loading ? 0 : readinessScore}
-        equipmentInMaintenance={
-          loading ? 0 : maintenanceCount
-        }
-        criticalRepairs={
-          loading ? 0 : criticalRepairsCount
-        }
-        overdueTransfers={loading ? 0 : overdueCount}
-      />
-
-      <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-5">
-        {cards.map((card) => (
-          <div
-            key={card.label}
-            className="rounded-2xl bg-white p-6 shadow"
-          >
-            <p className="text-gray-500">{card.label}</p>
-
-            <h2
-              className={`mt-3 text-4xl font-bold ${card.valueClassName}`}
-            >
-              {loading ? "—" : card.value}
-            </h2>
-          </div>
-        ))}
-      </div>
-
-      <div className="mt-10 grid gap-6 xl:grid-cols-2">
-        <CriticalRepairs />
-
-        <UpcomingMaintenance
-          records={upcomingMaintenance}
+      <section>
+        <SundayReadiness
+          score={loading ? 0 : readinessScore}
+          equipmentInMaintenance={
+            loading ? 0 : maintenanceCount
+          }
+          criticalRepairs={
+            loading ? 0 : criticalRepairsCount
+          }
+          overdueTransfers={loading ? 0 : overdueCount}
         />
-      </div>
+      </section>
 
-      <div className="mt-10 rounded-2xl bg-white p-8 shadow">
-        <div className="flex flex-wrap items-center justify-between gap-4">
+      <section>
+        <div className="mb-4">
+          <p className="text-sm font-semibold uppercase tracking-[0.16em] text-slate-500">
+            Equipment Health
+          </p>
+
+          <h2 className="mt-2 text-2xl font-bold text-slate-950">
+            Current status
+          </h2>
+        </div>
+
+        <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-5">
+          {statCards.map((card) => (
+            <article
+              key={card.label}
+              className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-6 shadow-sm"
+            >
+              <div
+                className={`absolute inset-x-0 top-0 h-1 ${card.accentClassName}`}
+              />
+
+              <p className="text-sm font-medium text-slate-500">
+                {card.label}
+              </p>
+
+              <p
+                className={`mt-4 text-4xl font-bold tracking-tight ${card.valueClassName}`}
+              >
+                {loading ? "—" : card.value}
+              </p>
+
+              <p className="mt-3 text-sm leading-6 text-slate-500">
+                {card.description}
+              </p>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      <section>
+        <div className="mb-4">
+          <p className="text-sm font-semibold uppercase tracking-[0.16em] text-slate-500">
+            Attention
+          </p>
+
+          <h2 className="mt-2 text-2xl font-bold text-slate-950">
+            What needs action
+          </h2>
+        </div>
+
+        <div className="grid gap-6 xl:grid-cols-2">
+          <CriticalRepairs />
+
+          <UpcomingMaintenance
+            records={upcomingMaintenance}
+          />
+        </div>
+      </section>
+
+      <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm md:p-8">
+        <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <h2 className="text-2xl font-bold">Quick Actions</h2>
+            <p className="text-sm font-semibold uppercase tracking-[0.16em] text-slate-500">
+              Shortcuts
+            </p>
 
-            <p className="mt-1 text-gray-500">
-              Manage equipment, repairs, and temporary transfers.
+            <h2 className="mt-2 text-2xl font-bold text-slate-950">
+              Quick actions
+            </h2>
+
+            <p className="mt-2 text-slate-500">
+              Jump directly into the most common operational tasks.
             </p>
           </div>
-
-          <Button
-            variant="outline"
-            onClick={loadDashboard}
-            disabled={loading}
-          >
-            {loading ? "Refreshing..." : "Refresh Dashboard"}
-          </Button>
         </div>
 
-        <div className="mt-6 flex flex-wrap gap-4">
-          <Link href="/inventory">
-            <Button>View Equipment</Button>
-          </Link>
+        <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+          {quickActions.map((action) => (
+            <Link
+              key={action.href}
+              href={action.href}
+              className="group rounded-2xl border border-slate-200 bg-slate-50 p-5 transition hover:-translate-y-0.5 hover:border-slate-300 hover:bg-white hover:shadow-md"
+            >
+              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-white text-xl shadow-sm">
+                {action.icon}
+              </div>
 
-          <Link href="/maintenance">
-            <Button variant="outline">View Maintenance</Button>
-          </Link>
+              <h3 className="mt-4 font-semibold text-slate-950">
+                {action.title}
+              </h3>
 
-          <Link href="/tools/export">
-            <Button variant="outline">Export Center</Button>
-          </Link>
+              <p className="mt-2 text-sm leading-6 text-slate-500">
+                {action.description}
+              </p>
 
-          <Link href="/inventory/new">
-            <Button variant="outline">Add Equipment</Button>
-          </Link>
+              <p className="mt-4 text-sm font-medium text-blue-600">
+                Open →
+              </p>
+            </Link>
+          ))}
         </div>
-      </div>
+      </section>
     </div>
   );
 }

@@ -24,71 +24,138 @@ export default function CheckoutHistory({
   normalizeStatus,
 }: CheckoutHistoryProps) {
   return (
-    <div className="mt-8 rounded-2xl bg-white p-8 shadow">
-      <h2 className="text-3xl font-bold">Checkout History</h2>
+    <section className="mt-8 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm md:p-8">
+      <div>
+        <p className="text-sm font-semibold uppercase tracking-[0.16em] text-slate-500">
+          Equipment Activity
+        </p>
 
-      <p className="mt-2 text-gray-500">
-        Checkout activity for this individual asset.
-      </p>
+        <h2 className="mt-2 text-3xl font-bold text-slate-950">
+          Transfer History
+        </h2>
+
+        <p className="mt-2 text-slate-500">
+          A chronological record of where this equipment has been assigned.
+        </p>
+      </div>
 
       {history.length === 0 ? (
-        <div className="mt-8 rounded-xl border border-dashed p-10 text-center">
-          <h3 className="text-xl font-semibold">No checkout history</h3>
+        <div className="mt-8 rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-10 text-center">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-white text-2xl shadow-sm">
+            🚚
+          </div>
 
-          <p className="mt-2 text-gray-500">
-            Activity will appear here after this asset is checked out.
+          <h3 className="mt-5 text-xl font-semibold text-slate-950">
+            No transfer history
+          </h3>
+
+          <p className="mt-2 text-slate-500">
+            Activity will appear here after this equipment is transferred.
           </p>
         </div>
       ) : (
-        <div className="mt-8 overflow-x-auto rounded-xl border">
-          <table className="w-full min-w-[850px]">
-            <thead className="bg-gray-100">
-              <tr>
-                <th className="p-4 text-left">Borrower</th>
-                <th className="p-4 text-left">Ministry</th>
-                <th className="p-4 text-left">Checkout Date</th>
-                <th className="p-4 text-left">Due Date</th>
-                <th className="p-4 text-left">Check-In Date</th>
-                <th className="p-4 text-left">Status</th>
-              </tr>
-            </thead>
+        <div className="relative mt-8">
+          <div className="absolute bottom-0 left-5 top-0 w-px bg-slate-200" />
 
-            <tbody>
-              {history.map((record) => (
-                <tr key={record.id} className="border-t">
-                  <td className="p-4 font-medium">
-                    {record.checked_out_by || "—"}
-                  </td>
+          <div className="space-y-6">
+            {history.map((record) => {
+              const isReturned =
+                normalizeStatus(record.status) === "returned";
 
-                  <td className="p-4">{record.ministry || "—"}</td>
+              return (
+                <article
+                  key={record.id}
+                  className="relative pl-14"
+                >
+                  <div
+                    className={`absolute left-0 top-1 flex h-10 w-10 items-center justify-center rounded-full border-4 border-white text-lg shadow-sm ${
+                      isReturned
+                        ? "bg-emerald-100 text-emerald-700"
+                        : "bg-amber-100 text-amber-700"
+                    }`}
+                  >
+                    {isReturned ? "✓" : "🚚"}
+                  </div>
 
-                  <td className="p-4">
-                    {formatDate(record.checkout_date)}
-                  </td>
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5 transition hover:border-slate-300 hover:bg-white hover:shadow-sm">
+                    <div className="flex flex-wrap items-start justify-between gap-4">
+                      <div>
+                        <p className="text-sm font-medium text-slate-500">
+                          {isReturned
+                            ? "Transfer completed"
+                            : "Equipment transferred"}
+                        </p>
 
-                  <td className="p-4">{formatDate(record.due_date)}</td>
+                        <h3 className="mt-1 text-lg font-semibold text-slate-950">
+                          {record.checked_out_by || "Unknown recipient"}
+                        </h3>
 
-                  <td className="p-4">
-                    {formatDate(record.checkin_date)}
-                  </td>
+                        <p className="mt-1 text-sm text-slate-500">
+                          {record.ministry || "No department recorded"}
+                        </p>
+                      </div>
 
-                  <td className="p-4">
-                    <span
-                      className={`rounded-full px-3 py-1 text-sm font-medium ${
-                        normalizeStatus(record.status) === "returned"
-                          ? "bg-green-100 text-green-700"
-                          : "bg-yellow-100 text-yellow-700"
-                      }`}
-                    >
-                      {record.status || "Unknown"}
-                    </span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                      <span
+                        className={`rounded-full px-3 py-1 text-sm font-semibold ${
+                          isReturned
+                            ? "bg-emerald-100 text-emerald-700"
+                            : "bg-amber-100 text-amber-700"
+                        }`}
+                      >
+                        {record.status || "Unknown"}
+                      </span>
+                    </div>
+
+                    <div className="mt-5 grid gap-4 border-t border-slate-200 pt-5 sm:grid-cols-2 xl:grid-cols-4">
+                      <TimelineDetail
+                        label="Transfer Date"
+                        value={formatDate(record.checkout_date)}
+                      />
+
+                      <TimelineDetail
+                        label="Due Date"
+                        value={formatDate(record.due_date)}
+                      />
+
+                      <TimelineDetail
+                        label="Return Date"
+                        value={formatDate(record.checkin_date)}
+                      />
+
+                      <TimelineDetail
+                        label="Recorded"
+                        value={formatDate(record.created_at)}
+                      />
+                    </div>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
         </div>
       )}
+    </section>
+  );
+}
+
+type TimelineDetailProps = {
+  label: string;
+  value: string;
+};
+
+function TimelineDetail({
+  label,
+  value,
+}: TimelineDetailProps) {
+  return (
+    <div>
+      <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">
+        {label}
+      </p>
+
+      <p className="mt-1 font-medium text-slate-800">
+        {value}
+      </p>
     </div>
   );
 }

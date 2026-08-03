@@ -2,7 +2,7 @@ type AssetHeaderProps = {
   title: string;
   assetTag: string | null;
   status: string | null;
-  statusClasses: (status: string | null) => string;
+  statusClasses: (status: string |null) => string;
 };
 
 export default function AssetHeader({
@@ -12,26 +12,63 @@ export default function AssetHeader({
   statusClasses,
 }: AssetHeaderProps) {
   return (
-    <div className="flex flex-wrap items-start justify-between gap-6">
-      <div>
-        <p className="text-sm font-medium uppercase tracking-wide text-gray-500">
-          Individual Asset
-        </p>
+    <div className="relative overflow-hidden rounded-3xl border border-slate-200 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-700 p-8 text-white shadow-xl">
+      <div className="absolute -right-10 -top-10 h-40 w-40 rounded-full bg-white/10 blur-2xl" />
+      <div className="absolute -bottom-16 -left-10 h-40 w-40 rounded-full bg-blue-400/10 blur-2xl" />
 
-        <h1 className="mt-2 text-4xl font-bold">{title}</h1>
+      <div className="relative flex flex-col gap-8 lg:flex-row lg:items-center lg:justify-between">
+        <div>
+          <div className="inline-flex items-center rounded-full bg-white/10 px-4 py-1 text-xs font-semibold uppercase tracking-[0.2em]">
+            Individual Asset
+          </div>
 
-        <p className="mt-2 text-gray-500">
-          Asset Tag: {assetTag || "Not assigned"}
-        </p>
+          <h1 className="mt-5 text-4xl font-bold tracking-tight md:text-5xl">
+            {title}
+          </h1>
+
+          <div className="mt-6 flex flex-wrap gap-3">
+            <div className="rounded-xl bg-white/10 px-4 py-3">
+              <p className="text-xs uppercase tracking-wide text-slate-300">
+                Asset Tag
+              </p>
+
+              <p className="mt-1 font-semibold">
+                {assetTag || "Not Assigned"}
+              </p>
+            </div>
+
+            <div className="rounded-xl bg-white/10 px-4 py-3">
+              <p className="text-xs uppercase tracking-wide text-slate-300">
+                Type
+              </p>
+
+              <p className="mt-1 font-semibold">
+                Equipment Asset
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex flex-col items-start lg:items-end">
+          <p className="mb-2 text-sm uppercase tracking-wide text-slate-300">
+            Current Status
+          </p>
+
+          <span
+            className={`rounded-full px-5 py-2 text-base font-semibold shadow ${statusClasses(
+              status
+            )}`}
+          >
+            {status || "Unknown"}
+          </span>
+
+          <p className="mt-4 max-w-xs text-sm text-slate-300">
+            This asset is tracked individually and can be
+            transferred, maintained, photographed, and managed
+            throughout its lifecycle.
+          </p>
+        </div>
       </div>
-
-      <span
-        className={`rounded-full px-4 py-2 font-semibold ${statusClasses(
-          status
-        )}`}
-      >
-        {status || "Unknown"}
-      </span>
     </div>
   );
 }
