@@ -79,15 +79,9 @@ export default function InventoryPage() {
       const matchesSearch =
         normalizedSearch.length === 0 ||
         item.name.toLowerCase().includes(normalizedSearch) ||
-        item.category
-          ?.toLowerCase()
-          .includes(normalizedSearch) ||
-        item.location
-          ?.toLowerCase()
-          .includes(normalizedSearch) ||
-        item.status
-          ?.toLowerCase()
-          .includes(normalizedSearch);
+        item.category?.toLowerCase().includes(normalizedSearch) ||
+        item.location?.toLowerCase().includes(normalizedSearch) ||
+        item.status?.toLowerCase().includes(normalizedSearch);
 
       const matchesCategory =
         categoryFilter === "All" ||
@@ -139,7 +133,7 @@ export default function InventoryPage() {
     return (
       <div className="p-8">
         <h1 className="text-3xl font-bold">
-          Loading inventory...
+          Loading equipment...
         </h1>
       </div>
     );
@@ -154,17 +148,23 @@ export default function InventoryPage() {
           </p>
 
           <h1 className="mt-2 text-4xl font-bold">
-            Inventory
+            Equipment
           </h1>
 
           <p className="mt-2 text-gray-500">
-            Manage equipment records and individual assets.
+            Manage equipment records and individual equipment items.
           </p>
         </div>
 
-        <Link href="/inventory/new">
-          <Button>Add Equipment</Button>
-        </Link>
+        <div className="flex flex-wrap gap-3">
+          <Link href="/tools/export">
+            <Button variant="outline">Export Center</Button>
+          </Link>
+
+          <Link href="/inventory/new">
+            <Button>Add Equipment</Button>
+          </Link>
+        </div>
       </div>
 
       {errorMessage && (
@@ -202,15 +202,10 @@ export default function InventoryPage() {
             }
             className="w-full rounded-lg border bg-white p-3"
           >
-            <option value="All">
-              All Categories
-            </option>
+            <option value="All">All Categories</option>
 
             {categories.map((category) => (
-              <option
-                key={category}
-                value={category}
-              >
+              <option key={category} value={category}>
                 {category}
               </option>
             ))}
@@ -229,15 +224,10 @@ export default function InventoryPage() {
             }
             className="w-full rounded-lg border bg-white p-3"
           >
-            <option value="All">
-              All Statuses
-            </option>
+            <option value="All">All Statuses</option>
 
             {statuses.map((status) => (
-              <option
-                key={status}
-                value={status}
-              >
+              <option key={status} value={status}>
                 {status}
               </option>
             ))}
@@ -288,29 +278,12 @@ export default function InventoryPage() {
             <table className="w-full min-w-[900px]">
               <thead className="bg-gray-100">
                 <tr>
-                  <th className="p-4 text-left">
-                    Equipment
-                  </th>
-
-                  <th className="p-4 text-left">
-                    Category
-                  </th>
-
-                  <th className="p-4 text-left">
-                    Quantity
-                  </th>
-
-                  <th className="p-4 text-left">
-                    Status
-                  </th>
-
-                  <th className="p-4 text-left">
-                    Location
-                  </th>
-
-                  <th className="p-4 text-left">
-                    Action
-                  </th>
+                  <th className="p-4 text-left">Equipment</th>
+                  <th className="p-4 text-left">Category</th>
+                  <th className="p-4 text-left">Quantity</th>
+                  <th className="p-4 text-left">Status</th>
+                  <th className="p-4 text-left">Location</th>
+                  <th className="p-4 text-left">Action</th>
                 </tr>
               </thead>
 

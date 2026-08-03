@@ -23,16 +23,16 @@ export default function AssetActionBar({
   return (
     <div className="mt-8 flex flex-wrap gap-4">
       <Link href={`/assets/${assetId}/edit`}>
-        <Button>Edit Asset</Button>
+        <Button>Edit Equipment</Button>
       </Link>
 
       <Link href={`/assets/${assetId}/maintenance`}>
-        <Button>Maintenance</Button>
+        <Button variant="outline">Report Issue</Button>
       </Link>
 
       {isAvailable && (
         <Button onClick={onShowCheckoutForm}>
-          Check Out Asset
+          Transfer Equipment
         </Button>
       )}
 
@@ -41,11 +41,11 @@ export default function AssetActionBar({
           onClick={onCheckIn}
           disabled={checkingIn}
         >
-          {checkingIn ? "Checking In..." : "Check In Asset"}
+          {checkingIn ? "Returning..." : "Return Equipment"}
         </Button>
       )}
 
-      <Button onClick={onPrintQRCode}>
+      <Button variant="outline" onClick={onPrintQRCode}>
         Print QR Code
       </Button>
     </div>

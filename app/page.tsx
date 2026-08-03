@@ -2,10 +2,11 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { supabase } from "@/lib/supabase";
+import CriticalRepairs from "@/components/dashboard/CriticalRepairs";
 import { Button } from "@/components/ui/button";
+import { supabase } from "@/lib/supabase";
 
-type AssetSummary = {
+type EquipmentSummary = {
   status: string | null;
   due_date: string | null;
 };
@@ -13,7 +14,7 @@ type AssetSummary = {
 type DashboardStats = {
   total: number;
   available: number;
-  checkedOut: number;
+  transferred: number;
   maintenance: number;
   overdue: number;
 };
@@ -21,7 +22,7 @@ type DashboardStats = {
 const emptyStats: DashboardStats = {
   total: 0,
   available: 0,
-  checkedOut: 0,
+  transferred: 0,
   maintenance: 0,
   overdue: 0,
 };
@@ -55,35 +56,35 @@ export default function DashboardPage() {
       return;
     }
 
-    const assets = (data ?? []) as AssetSummary[];
+    const equipmentItems = (data ?? []) as EquipmentSummary[];
     const today = new Date().toISOString().split("T")[0];
 
-    const available = assets.filter(
-      (asset) => normalizeStatus(asset.status) === "available"
+    const available = equipmentItems.filter(
+      (item) => normalizeStatus(item.status) === "available"
     ).length;
 
-    const checkedOut = assets.filter(
-      (asset) => normalizeStatus(asset.status) === "checked out"
+    const transferred = equipmentItems.filter(
+      (item) => normalizeStatus(item.status) === "checked out"
     ).length;
 
-    const maintenance = assets.filter((asset) => {
-      const status = normalizeStatus(asset.status);
+    const maintenance = equipmentItems.filter((item) => {
+      const status = normalizeStatus(item.status);
 
       return status === "maintenance" || status === "in repair";
     }).length;
 
-    const overdue = assets.filter((asset) => {
+    const overdue = equipmentItems.filter((item) => {
       return (
-        normalizeStatus(asset.status) === "checked out" &&
-        asset.due_date !== null &&
-        asset.due_date < today
+        normalizeStatus(item.status) === "checked out" &&
+        item.due_date !== null &&
+        item.due_date < today
       );
     }).length;
 
     setStats({
-      total: assets.length,
+      total: equipmentItems.length,
       available,
-      checkedOut,
+      transferred,
       maintenance,
       overdue,
     });
@@ -93,7 +94,7 @@ export default function DashboardPage() {
 
   const cards = [
     {
-      label: "Total Assets",
+      label: "Total Equipment",
       value: stats.total,
       valueClassName: "text-gray-900",
     },
@@ -103,8 +104,8 @@ export default function DashboardPage() {
       valueClassName: "text-green-600",
     },
     {
-      label: "Checked Out",
-      value: stats.checkedOut,
+      label: "Transferred",
+      value: stats.transferred,
       valueClassName: "text-yellow-600",
     },
     {
@@ -113,7 +114,7 @@ export default function DashboardPage() {
       valueClassName: "text-red-600",
     },
     {
-      label: "Overdue",
+      label: "Overdue Return",
       value: stats.overdue,
       valueClassName: "text-orange-600",
     },
@@ -137,7 +138,10 @@ export default function DashboardPage() {
 
       {errorMessage && (
         <div className="mb-6 rounded-xl border border-red-200 bg-red-50 p-4 text-red-700">
-          <p className="font-semibold">Dashboard could not be loaded.</p>
+          <p className="font-semibold">
+            Dashboard could not be loaded.
+          </p>
+
           <p className="mt-1 text-sm">{errorMessage}</p>
 
           <Button
@@ -167,13 +171,17 @@ export default function DashboardPage() {
         ))}
       </div>
 
+      <div className="mt-10">
+        <CriticalRepairs />
+      </div>
+
       <div className="mt-10 rounded-2xl bg-white p-8 shadow">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
             <h2 className="text-2xl font-bold">Quick Actions</h2>
 
             <p className="mt-1 text-gray-500">
-              Manage your inventory and individual assets.
+              Manage equipment, repairs, and temporary transfers.
             </p>
           </div>
 
@@ -188,7 +196,11 @@ export default function DashboardPage() {
 
         <div className="mt-6 flex flex-wrap gap-4">
           <Link href="/inventory">
-            <Button>View Inventory</Button>
+            <Button>View Equipment</Button>
+          </Link>
+
+          <Link href="/maintenance">
+            <Button variant="outline">View Maintenance</Button>
           </Link>
 
           <Link href="/inventory/new">
