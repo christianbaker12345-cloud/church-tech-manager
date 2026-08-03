@@ -3,6 +3,10 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import CriticalRepairs from "@/components/dashboard/CriticalRepairs";
+import SundayReadiness from "@/components/dashboard/SundayReadiness";
+import UpcomingMaintenance, {
+  type UpcomingMaintenanceRecord,
+} from "@/components/dashboard/UpcomingMaintenance";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/lib/supabase";
 
@@ -17,6 +21,7 @@ type DashboardStats = {
   transferred: number;
   maintenance: number;
   overdue: number;
+  criticalRepairs: number;
 };
 
 const emptyStats: DashboardStats = {
@@ -25,10 +30,14 @@ const emptyStats: DashboardStats = {
   transferred: 0,
   maintenance: 0,
   overdue: 0,
+  criticalRepairs: 0,
 };
 
 export default function DashboardPage() {
   const [stats, setStats] = useState<DashboardStats>(emptyStats);
+  const [upcomingMaintenance, setUpcomingMaintenance] = useState<
+    UpcomingMaintenanceRecord[]
+  >([]);
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
 
@@ -44,20 +53,81 @@ export default function DashboardPage() {
     setLoading(true);
     setErrorMessage("");
 
-    const { data, error } = await supabase
-      .from("assets")
-      .select("status,due_date");
+    const today = new Date().toISOString().split("T")[0];
 
-    if (error) {
-      console.error("Dashboard load error:", error);
-      setErrorMessage(error.message);
+    const [
+      equipmentResult,
+      upcomingMaintenanceResult,
+      criticalRepairsResult,
+    ] = await Promise.all([
+      supabase.from("assets").select("status,due_date"),
+
+      supabase
+        .from("asset_maintenance")
+        .select(`
+          id,
+          asset_id,
+          issue_title,
+          next_service_date,
+          assets (
+            display_name,
+            asset_tag
+          )
+        `)
+        .not("next_service_date", "is", null)
+        .gte("next_service_date", today)
+        .order("next_service_date", { ascending: true })
+        .limit(5),
+
+      supabase
+        .from("asset_maintenance")
+        .select("id")
+        .in("status", ["Open", "In Progress"])
+        .in("priority", ["High", "Urgent"]),
+    ]);
+
+    if (equipmentResult.error) {
+      console.error(
+        "Dashboard equipment load error:",
+        equipmentResult.error
+      );
+      setErrorMessage(equipmentResult.error.message);
       setStats(emptyStats);
+      setUpcomingMaintenance([]);
       setLoading(false);
       return;
     }
 
-    const equipmentItems = (data ?? []) as EquipmentSummary[];
-    const today = new Date().toISOString().split("T")[0];
+    const dashboardErrors: string[] = [];
+
+    if (upcomingMaintenanceResult.error) {
+      console.error(
+        "Upcoming maintenance load error:",
+        upcomingMaintenanceResult.error
+      );
+      dashboardErrors.push(upcomingMaintenanceResult.error.message);
+      setUpcomingMaintenance([]);
+    } else {
+      setUpcomingMaintenance(
+        (upcomingMaintenanceResult.data ??
+          []) as UpcomingMaintenanceRecord[]
+      );
+    }
+
+    if (criticalRepairsResult.error) {
+      console.error(
+        "Critical repairs count error:",
+        criticalRepairsResult.error
+      );
+      dashboardErrors.push(criticalRepairsResult.error.message);
+    }
+
+    if (dashboardErrors.length > 0) {
+      setErrorMessage(dashboardErrors.join(" "));
+    }
+
+    const equipmentItems =
+      (equipmentResult.data ?? []) as EquipmentSummary[];
 
     const available = equipmentItems.filter(
       (item) => normalizeStatus(item.status) === "available"
@@ -73,13 +143,16 @@ export default function DashboardPage() {
       return status === "maintenance" || status === "in repair";
     }).length;
 
-    const overdue = equipmentItems.filter((item) => {
-      return (
+    const overdue = equipmentItems.filter(
+      (item) =>
         normalizeStatus(item.status) === "checked out" &&
         item.due_date !== null &&
         item.due_date < today
-      );
-    }).length;
+    ).length;
+
+    const criticalRepairs = criticalRepairsResult.error
+      ? 0
+      : (criticalRepairsResult.data ?? []).length;
 
     setStats({
       total: equipmentItems.length,
@@ -87,10 +160,36 @@ export default function DashboardPage() {
       transferred,
       maintenance,
       overdue,
+      criticalRepairs,
     });
 
     setLoading(false);
   }
+
+  const maintenanceCount = Number.isFinite(stats.maintenance)
+    ? stats.maintenance
+    : 0;
+
+  const criticalRepairsCount = Number.isFinite(
+    stats.criticalRepairs
+  )
+    ? stats.criticalRepairs
+    : 0;
+
+  const overdueCount = Number.isFinite(stats.overdue)
+    ? stats.overdue
+    : 0;
+
+  const readinessScore = Math.max(
+    0,
+    Math.min(
+      100,
+      100 -
+        maintenanceCount * 5 -
+        criticalRepairsCount * 10 -
+        overdueCount * 5
+    )
+  );
 
   const cards = [
     {
@@ -139,7 +238,7 @@ export default function DashboardPage() {
       {errorMessage && (
         <div className="mb-6 rounded-xl border border-red-200 bg-red-50 p-4 text-red-700">
           <p className="font-semibold">
-            Dashboard could not be loaded.
+            Some dashboard information could not be loaded.
           </p>
 
           <p className="mt-1 text-sm">{errorMessage}</p>
@@ -153,6 +252,17 @@ export default function DashboardPage() {
           </Button>
         </div>
       )}
+
+      <SundayReadiness
+        score={loading ? 0 : readinessScore}
+        equipmentInMaintenance={
+          loading ? 0 : maintenanceCount
+        }
+        criticalRepairs={
+          loading ? 0 : criticalRepairsCount
+        }
+        overdueTransfers={loading ? 0 : overdueCount}
+      />
 
       <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-5">
         {cards.map((card) => (
@@ -171,8 +281,12 @@ export default function DashboardPage() {
         ))}
       </div>
 
-      <div className="mt-10">
+      <div className="mt-10 grid gap-6 xl:grid-cols-2">
         <CriticalRepairs />
+
+        <UpcomingMaintenance
+          records={upcomingMaintenance}
+        />
       </div>
 
       <div className="mt-10 rounded-2xl bg-white p-8 shadow">
@@ -201,6 +315,10 @@ export default function DashboardPage() {
 
           <Link href="/maintenance">
             <Button variant="outline">View Maintenance</Button>
+          </Link>
+
+          <Link href="/tools/export">
+            <Button variant="outline">Export Center</Button>
           </Link>
 
           <Link href="/inventory/new">

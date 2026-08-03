@@ -41,7 +41,7 @@ export default function AssetPhotos({
     <div className="mt-8 rounded-2xl bg-white p-8 shadow">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h2 className="text-3xl font-bold">Asset Photos</h2>
+          <h2 className="text-3xl font-bold">Equipment Photos</h2>
 
           <p className="mt-2 text-gray-500">
             Add identification, serial-number, damage, and receipt photos.
@@ -102,7 +102,7 @@ export default function AssetPhotos({
           <h3 className="text-xl font-semibold">No photos yet</h3>
 
           <p className="mt-2 text-gray-500">
-            Upload the first photo for this individual asset.
+            Upload the first photo for this equipment item.
           </p>
         </div>
       ) : (
@@ -127,7 +127,7 @@ export default function AssetPhotos({
 
               <div className="p-4">
                 <p className="font-medium">
-                  {photo.caption || "Asset photo"}
+                  {photo.caption || "Equipment photo"}
                 </p>
 
                 <p className="mt-1 text-sm text-gray-500">

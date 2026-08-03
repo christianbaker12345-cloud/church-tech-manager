@@ -5,6 +5,7 @@ import AssetActionBar from "@/components/assets/AssetActionBar";
 import AssetInformation from "@/components/assets/AssetInformation";
 import AssetQRCode from "@/components/assets/AssetQRCode";
 import AssetPhotos from "@/components/assets/AssetPhotos";
+import CheckoutDialog from "@/components/assets/CheckoutDialog";
 import CheckoutHistory, {
   type AssetCheckoutHistory,
 } from "@/components/assets/CheckoutHistory";
@@ -70,8 +71,10 @@ export default function AssetDetailsPage() {
     useState(false);
 
   const [checkedOutBy, setCheckedOutBy] = useState("");
-  const [ministry, setMinistry] = useState("");
+  const [department, setDepartment] = useState("");
+  const [purpose, setPurpose] = useState("");
   const [dueDate, setDueDate] = useState("");
+  const [checkoutNotes, setCheckoutNotes] = useState("");
 
   const [checkingOut, setCheckingOut] = useState(false);
   const [checkingIn, setCheckingIn] = useState(false);
@@ -111,7 +114,7 @@ export default function AssetDetailsPage() {
 
     if (!assetResult.data) {
       setErrorMessage(
-        "No individual asset was found with this ID."
+        "No equipment item was found with this ID."
       );
       setAsset(null);
       setLoading(false);
@@ -146,22 +149,38 @@ export default function AssetDetailsPage() {
     }
 
     const historyResult = await supabase
-      .from("asset_checkout_history")
+      .from("equipment_transfers")
       .select("*")
       .eq("asset_id", assetId)
       .order("created_at", { ascending: false });
 
     if (historyResult.error) {
       console.error(
-        "Asset checkout history load error:",
+        "Equipment transfer history load error:",
         historyResult.error
       );
 
       setHistory([]);
     } else {
-      setHistory(
-        (historyResult.data ?? []) as AssetCheckoutHistory[]
-      );
+      const mappedHistory = (historyResult.data ?? []).map(
+        (transfer) => ({
+          id: transfer.id,
+          asset_id: transfer.asset_id,
+          asset_tag: loadedAsset.asset_tag,
+          display_name: loadedAsset.display_name,
+          checked_out_by: transfer.checked_out_by,
+          ministry: transfer.department,
+          checkout_date: transfer.checked_out_date,
+          due_date: transfer.due_date,
+          checkin_date: transfer.returned_date,
+          status: transfer.returned_date
+            ? "Returned"
+            : "Checked Out",
+          created_at: transfer.created_at,
+        })
+      ) as AssetCheckoutHistory[];
+
+      setHistory(mappedHistory);
     }
 
     const photosResult = await supabase
@@ -366,7 +385,7 @@ export default function AssetDetailsPage() {
 
     if (!checkedOutBy.trim()) {
       alert(
-        "Enter the person or group checking out this asset."
+        "Enter the person or group receiving this equipment."
       );
       return;
     }
@@ -379,10 +398,10 @@ export default function AssetDetailsPage() {
     const name =
       asset.display_name ||
       asset.asset_tag ||
-      "this asset";
+      "this equipment";
 
     const confirmed = window.confirm(
-      `Check out ${name} to ${checkedOutBy.trim()}?`
+      `Transfer ${name} to ${checkedOutBy.trim()}?`
     );
 
     if (!confirmed) return;
@@ -393,12 +412,39 @@ export default function AssetDetailsPage() {
       .toISOString()
       .split("T")[0];
 
+    const { data: transferRecord, error: transferInsertError } =
+      await supabase
+        .from("equipment_transfers")
+        .insert({
+          asset_id: asset.id,
+          checked_out_by: checkedOutBy.trim(),
+          department: department.trim() || null,
+          purpose: purpose.trim() || null,
+          checked_out_date: checkoutDate,
+          due_date: dueDate,
+          notes: checkoutNotes.trim() || null,
+          updated_at: new Date().toISOString(),
+        })
+        .select("id")
+        .single();
+
+    if (transferInsertError) {
+      console.error(
+        "Equipment transfer insert error:",
+        transferInsertError
+      );
+
+      alert(transferInsertError.message);
+      setCheckingOut(false);
+      return;
+    }
+
     const { error: assetUpdateError } = await supabase
       .from("assets")
       .update({
         status: "Checked Out",
         checked_out_by: checkedOutBy.trim(),
-        ministry: ministry.trim() || null,
+        ministry: department.trim() || null,
         checkout_date: checkoutDate,
         due_date: dueDate,
       })
@@ -406,46 +452,31 @@ export default function AssetDetailsPage() {
 
     if (assetUpdateError) {
       console.error(
-        "Asset checkout update error:",
+        "Equipment transfer status update error:",
         assetUpdateError
       );
+
+      if (transferRecord?.id) {
+        await supabase
+          .from("equipment_transfers")
+          .delete()
+          .eq("id", transferRecord.id);
+      }
 
       alert(assetUpdateError.message);
       setCheckingOut(false);
       return;
     }
 
-    const { error: historyInsertError } = await supabase
-      .from("asset_checkout_history")
-      .insert({
-        asset_id: asset.id,
-        asset_tag: asset.asset_tag,
-        display_name: asset.display_name,
-        checked_out_by: checkedOutBy.trim(),
-        ministry: ministry.trim() || null,
-        checkout_date: checkoutDate,
-        due_date: dueDate,
-        status: "Checked Out",
-      });
-
-    if (historyInsertError) {
-      console.error(
-        "Asset checkout history insert error:",
-        historyInsertError
-      );
-
-      alert(
-        `The asset was checked out, but its history could not be saved:\n\n${historyInsertError.message}`
-      );
-    } else {
-      alert("Asset checked out successfully.");
-    }
+    alert("Equipment transferred successfully.");
 
     setCheckingOut(false);
     setShowCheckoutForm(false);
     setCheckedOutBy("");
-    setMinistry("");
+    setDepartment("");
+    setPurpose("");
     setDueDate("");
+    setCheckoutNotes("");
 
     await loadPage();
   }
@@ -456,19 +487,39 @@ export default function AssetDetailsPage() {
     const name =
       asset.display_name ||
       asset.asset_tag ||
-      "this asset";
+      "this equipment";
 
     const confirmed = window.confirm(
-      `Check in ${name}?`
+      `Return ${name}?`
     );
 
     if (!confirmed) return;
 
     setCheckingIn(true);
 
-    const checkinDate = new Date()
+    const returnDate = new Date()
       .toISOString()
       .split("T")[0];
+
+    const { error: transferUpdateError } = await supabase
+      .from("equipment_transfers")
+      .update({
+        returned_date: returnDate,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("asset_id", assetId)
+      .is("returned_date", null);
+
+    if (transferUpdateError) {
+      console.error(
+        "Equipment transfer return error:",
+        transferUpdateError
+      );
+
+      alert(transferUpdateError.message);
+      setCheckingIn(false);
+      return;
+    }
 
     const { error: assetUpdateError } = await supabase
       .from("assets")
@@ -483,38 +534,19 @@ export default function AssetDetailsPage() {
 
     if (assetUpdateError) {
       console.error(
-        "Asset check-in update error:",
+        "Equipment return status update error:",
         assetUpdateError
       );
 
-      alert(assetUpdateError.message);
+      alert(
+        `The transfer was marked returned, but the equipment status could not be updated:\n\n${assetUpdateError.message}`
+      );
       setCheckingIn(false);
+      await loadPage();
       return;
     }
 
-    const { error: historyUpdateError } = await supabase
-      .from("asset_checkout_history")
-      .update({
-        checkin_date: checkinDate,
-        status: "Returned",
-      })
-      .eq("asset_id", assetId)
-      .eq("status", "Checked Out")
-      .is("checkin_date", null);
-
-    if (historyUpdateError) {
-      console.error(
-        "Asset checkout history update error:",
-        historyUpdateError
-      );
-
-      alert(
-        `The asset was checked in, but its history could not be updated:\n\n${historyUpdateError.message}`
-      );
-    } else {
-      alert("Asset checked in successfully.");
-    }
-
+    alert("Equipment returned successfully.");
     setCheckingIn(false);
 
     await loadPage();
@@ -528,7 +560,7 @@ export default function AssetDetailsPage() {
     return (
       <div className="p-8">
         <h1 className="text-3xl font-bold">
-          Loading asset...
+          Loading equipment...
         </h1>
       </div>
     );
@@ -538,7 +570,7 @@ export default function AssetDetailsPage() {
     return (
       <div className="p-8">
         <h1 className="text-3xl font-bold">
-          Asset Not Found
+          Equipment Not Found
         </h1>
 
         {errorMessage && (
@@ -569,7 +601,7 @@ export default function AssetDetailsPage() {
     asset.display_name ||
     equipment?.name ||
     asset.asset_tag ||
-    "Unnamed Asset";
+    "Unnamed Equipment";
 
   const qrUrl =
     typeof window !== "undefined"
@@ -618,93 +650,36 @@ export default function AssetDetailsPage() {
 
           {!isAvailable && !isCheckedOut && (
             <p className="mt-4 text-sm text-gray-500">
-              This asset cannot be checked out while its
+              This equipment cannot be transferred while its
               status is {asset.status || "Unknown"}.
             </p>
           )}
 
           {showCheckoutForm && isAvailable && (
-            <div className="mt-8 rounded-xl border bg-gray-50 p-6">
-              <div className="flex items-center justify-between gap-4">
-                <div>
-                  <h2 className="text-2xl font-bold">
-                    Check Out Asset
-                  </h2>
-
-                  <p className="mt-1 text-gray-500">
-                    {displayName}
-                  </p>
-                </div>
-
-                <button
-                  type="button"
-                  className="text-sm text-gray-500 hover:text-gray-900"
-                  onClick={() =>
-                    setShowCheckoutForm(false)
-                  }
-                >
-                  Cancel
-                </button>
-              </div>
-
-              <div className="mt-6 space-y-5">
-                <div>
-                  <label className="mb-2 block font-medium">
-                    Person or Group
-                  </label>
-
-                  <input
-                    type="text"
-                    className="w-full rounded-lg border bg-white p-3"
-                    placeholder="Who is borrowing this asset?"
-                    value={checkedOutBy}
-                    onChange={(event) =>
-                      setCheckedOutBy(event.target.value)
-                    }
-                  />
-                </div>
-
-                <div>
-                  <label className="mb-2 block font-medium">
-                    Ministry
-                  </label>
-
-                  <input
-                    type="text"
-                    className="w-full rounded-lg border bg-white p-3"
-                    placeholder="Worship, Youth, Production..."
-                    value={ministry}
-                    onChange={(event) =>
-                      setMinistry(event.target.value)
-                    }
-                  />
-                </div>
-
-                <div>
-                  <label className="mb-2 block font-medium">
-                    Due Date
-                  </label>
-
-                  <input
-                    type="date"
-                    className="w-full rounded-lg border bg-white p-3"
-                    value={dueDate}
-                    onChange={(event) =>
-                      setDueDate(event.target.value)
-                    }
-                  />
-                </div>
-
-                <Button
-                  onClick={checkOutAsset}
-                  disabled={checkingOut}
-                >
-                  {checkingOut
-                    ? "Completing Checkout..."
-                    : "Complete Checkout"}
-                </Button>
-              </div>
-            </div>
+            <CheckoutDialog
+              open={showCheckoutForm}
+              displayName={displayName}
+              checkedOutBy={checkedOutBy}
+              department={department}
+              purpose={purpose}
+              dueDate={dueDate}
+              notes={checkoutNotes}
+              checkingOut={checkingOut}
+              onCheckedOutByChange={setCheckedOutBy}
+              onDepartmentChange={setDepartment}
+              onPurposeChange={setPurpose}
+              onDueDateChange={setDueDate}
+              onNotesChange={setCheckoutNotes}
+              onCancel={() => {
+                setShowCheckoutForm(false);
+                setCheckedOutBy("");
+                setDepartment("");
+                setPurpose("");
+                setDueDate("");
+                setCheckoutNotes("");
+              }}
+              onSubmit={checkOutAsset}
+            />
           )}
         </div>
 
