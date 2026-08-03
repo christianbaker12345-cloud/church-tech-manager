@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
+import EmptyState from "@/components/ui/EmptyState";
 import { supabase } from "@/lib/supabase";
 
 type Equipment = {
@@ -403,34 +404,24 @@ export default function InventoryPage() {
 
         {filteredEquipment.length === 0 ? (
           <div className="p-8 md:p-12">
-            <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-10 text-center">
-              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-white text-2xl shadow-sm">
-                📦
-              </div>
-
-              <h3 className="mt-5 text-xl font-semibold text-slate-950">
-                No equipment found
-              </h3>
-
-              <p className="mt-2 text-slate-500">
-                Add equipment or adjust your search and filters.
-              </p>
-
-              <div className="mt-6 flex flex-wrap justify-center gap-3">
-                {hasActiveFilters && (
-                  <Button
-                    variant="outline"
-                    onClick={clearFilters}
-                  >
-                    Clear Filters
-                  </Button>
-                )}
-
-                <Link href="/inventory/new">
-                  <Button>Add Equipment</Button>
-                </Link>
-              </div>
-            </div>
+            <EmptyState
+              icon="📦"
+              title="No equipment found"
+              description="Add equipment or adjust your search and filters."
+              secondaryAction={
+                hasActiveFilters
+                  ? {
+                      label: "Clear Filters",
+                      variant: "outline",
+                      onClick: clearFilters,
+                    }
+                  : undefined
+              }
+              primaryAction={{
+                label: "Add Equipment",
+                href: "/inventory/new",
+              }}
+            />
           </div>
         ) : (
           <div className="overflow-x-auto">

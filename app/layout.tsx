@@ -1,11 +1,17 @@
 import "./globals.css";
 import type { Metadata } from "next";
+import { Manrope } from "next/font/google";
 import { AppSidebar } from "@/components/layout/AppSidebar";
+
+const manrope = Manrope({
+  subsets: ["latin"],
+  display: "swap",
+  variable: "--font-manrope",
+});
 
 export const metadata: Metadata = {
   title: "Church Tech Manager",
-  description:
-    "Equipment, maintenance, transfer, and readiness management for church production teams.",
+  description: "Church equipment management system",
 };
 
 export default function RootLayout({
@@ -15,7 +21,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className="min-h-screen bg-slate-100 text-slate-950 antialiased">
+      <body
+        className={`${manrope.variable} bg-slate-50 font-sans antialiased`}
+      >
         <div className="flex min-h-screen">
           <AppSidebar />
 

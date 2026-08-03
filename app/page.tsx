@@ -3,11 +3,18 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import CriticalRepairs from "@/components/dashboard/CriticalRepairs";
+import EquipmentByCategory from "@/components/dashboard/EquipmentByCategory";
+import EquipmentStatusAnalytics from "@/components/dashboard/EquipmentStatusAnalytics";
+import EquipmentCategoryChart from "@/components/dashboard/EquipmentCategoryChart";
+import RecentActivity from "@/components/dashboard/RecentActivity";
 import SundayReadiness from "@/components/dashboard/SundayReadiness";
 import UpcomingMaintenance, {
   type UpcomingMaintenanceRecord,
 } from "@/components/dashboard/UpcomingMaintenance";
 import { Button } from "@/components/ui/button";
+import PageHeader from "@/components/ui/PageHeader";
+import SectionCard from "@/components/ui/SectionCard";
+import StatsCard from "@/components/ui/StatsCard";
 import { supabase } from "@/lib/supabase";
 
 type EquipmentSummary = {
@@ -284,35 +291,26 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-10">
-      <header className="flex flex-wrap items-end justify-between gap-6">
-        <div>
-          <p className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">
-            Operations Dashboard
-          </p>
+      <PageHeader
+        eyebrow="Operations Dashboard"
+        title={`${getGreeting()}, Christian`}
+        description={formatToday()}
+        actions={
+          <>
+            <Button
+              variant="outline"
+              onClick={loadDashboard}
+              disabled={loading}
+            >
+              {loading ? "Refreshing..." : "Refresh"}
+            </Button>
 
-          <h1 className="mt-3 text-4xl font-bold tracking-tight text-slate-950 md:text-5xl">
-            {getGreeting()}, Christian
-          </h1>
-
-          <p className="mt-3 text-base text-slate-500">
-            {formatToday()}
-          </p>
-        </div>
-
-        <div className="flex flex-wrap gap-3">
-          <Button
-            variant="outline"
-            onClick={loadDashboard}
-            disabled={loading}
-          >
-            {loading ? "Refreshing..." : "Refresh"}
-          </Button>
-
-          <Link href="/inventory/new">
-            <Button>Add Equipment</Button>
-          </Link>
-        </div>
-      </header>
+            <Link href="/inventory/new">
+              <Button>Add Equipment</Button>
+            </Link>
+          </>
+        }
+      />
 
       {errorMessage && (
         <section className="rounded-2xl border border-rose-200 bg-rose-50 p-5 text-rose-800 shadow-sm">
@@ -358,30 +356,62 @@ export default function DashboardPage() {
 
         <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-5">
           {statCards.map((card) => (
-            <article
+            <StatsCard
               key={card.label}
-              className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-6 shadow-sm"
-            >
-              <div
-                className={`absolute inset-x-0 top-0 h-1 ${card.accentClassName}`}
-              />
-
-              <p className="text-sm font-medium text-slate-500">
-                {card.label}
-              </p>
-
-              <p
-                className={`mt-4 text-4xl font-bold tracking-tight ${card.valueClassName}`}
-              >
-                {loading ? "—" : card.value}
-              </p>
-
-              <p className="mt-3 text-sm leading-6 text-slate-500">
-                {card.description}
-              </p>
-            </article>
+              label={card.label}
+              value={card.value}
+              description={card.description}
+              accentClassName={card.accentClassName}
+              valueClassName={card.valueClassName}
+              loading={loading}
+            />
           ))}
         </div>
+      </section>
+
+      <section>
+        <div className="mb-4">
+          <p className="text-sm font-semibold uppercase tracking-[0.16em] text-slate-500">
+            Analytics
+          </p>
+
+          <h2 className="mt-2 text-2xl font-bold text-slate-950">
+            Equipment distribution
+          </h2>
+        </div>
+
+        <div className="grid gap-6 xl:grid-cols-2">
+          <EquipmentByCategory />
+          <EquipmentCategoryChart />
+        </div>
+      </section>
+
+      <section>
+        <div className="mb-4">
+          <p className="text-sm font-semibold uppercase tracking-[0.16em] text-slate-500">
+            Analytics
+          </p>
+
+          <h2 className="mt-2 text-2xl font-bold text-slate-950">
+            Equipment status
+          </h2>
+        </div>
+
+        <EquipmentStatusAnalytics />
+      </section>
+
+      <section>
+        <div className="mb-4">
+          <p className="text-sm font-semibold uppercase tracking-[0.16em] text-slate-500">
+            Operations
+          </p>
+
+          <h2 className="mt-2 text-2xl font-bold text-slate-950">
+            Recent activity
+          </h2>
+        </div>
+
+        <RecentActivity />
       </section>
 
       <section>
@@ -404,24 +434,13 @@ export default function DashboardPage() {
         </div>
       </section>
 
-      <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm md:p-8">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <p className="text-sm font-semibold uppercase tracking-[0.16em] text-slate-500">
-              Shortcuts
-            </p>
-
-            <h2 className="mt-2 text-2xl font-bold text-slate-950">
-              Quick actions
-            </h2>
-
-            <p className="mt-2 text-slate-500">
-              Jump directly into the most common operational tasks.
-            </p>
-          </div>
-        </div>
-
-        <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+      <SectionCard
+        eyebrow="Shortcuts"
+        title="Quick actions"
+        description="Jump directly into the most common operational tasks."
+        contentClassName="pt-6"
+      >
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
           {quickActions.map((action) => (
             <Link
               key={action.href}
@@ -446,7 +465,7 @@ export default function DashboardPage() {
             </Link>
           ))}
         </div>
-      </section>
+      </SectionCard>
     </div>
   );
 }

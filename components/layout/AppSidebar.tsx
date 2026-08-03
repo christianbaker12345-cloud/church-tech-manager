@@ -2,52 +2,232 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import type { LucideIcon } from "lucide-react";
+import {
+  Activity,
+  ArrowLeftRight,
+  BarChart3,
+  CalendarDays,
+  ChevronRight,
+  ClipboardCheck,
+  Download,
+  Gauge,
+  Package,
+  Settings,
+  SlidersHorizontal,
+  UserRound,
+  Wrench,
+} from "lucide-react";
+
+type NavigationItem = {
+  name: string;
+  href: string;
+  icon: LucideIcon;
+};
+
+type NavigationSection = {
+  label: string;
+  items: NavigationItem[];
+};
+
+const sections: NavigationSection[] = [
+  {
+    label: "Overview",
+    items: [
+      {
+        name: "Dashboard",
+        href: "/",
+        icon: Gauge,
+      },
+      {
+        name: "Operations Center",
+        href: "/operations",
+        icon: Activity,
+      },
+    ],
+  },
+  {
+    label: "Operations",
+    items: [
+      {
+        name: "Inventory",
+        href: "/inventory",
+        icon: Package,
+      },
+      {
+        name: "Transfers",
+        href: "/transfers",
+        icon: ArrowLeftRight,
+      },
+      {
+        name: "Maintenance",
+        href: "/maintenance",
+        icon: Wrench,
+      },
+      {
+        name: "Events",
+        href: "/events",
+        icon: CalendarDays,
+      },
+      {
+        name: "Kits & Racks",
+        href: "/kits",
+        icon: SlidersHorizontal,
+      },
+      {
+        name: "Check In / Out",
+        href: "/checkin",
+        icon: ClipboardCheck,
+      },
+    ],
+  },
+  {
+    label: "Management",
+    items: [
+      {
+        name: "Reports",
+        href: "/reports",
+        icon: BarChart3,
+      },
+      {
+        name: "Export Center",
+        href: "/tools/export",
+        icon: Download,
+      },
+      {
+        name: "Settings",
+        href: "/settings",
+        icon: Settings,
+      },
+    ],
+  },
+];
 
 export function AppSidebar() {
   const pathname = usePathname();
 
-  const menuItems = [
-    { name: "Dashboard", href: "/", icon: "🏠" },
-    { name: "Inventory", href: "/inventory", icon: "📦" },
-    { name: "Transfers", href: "/transfers", icon: "🚚" },
-    { name: "Maintenance", href: "/maintenance", icon: "🔧" },
-    { name: "Events", href: "/events", icon: "📅" },
-    { name: "Kits & Racks", href: "/kits", icon: "🎛️" },
-    { name: "Check In / Out", href: "/checkin", icon: "📋" },
-    { name: "Reports", href: "/reports", icon: "📊" },
-    { name: "Export Center", href: "/tools/export", icon: "📤" },
-    { name: "Settings", href: "/settings", icon: "⚙️" },
-  ];
+  function isActive(href: string) {
+    if (href === "/") {
+      return pathname === "/";
+    }
+
+    return pathname === href || pathname.startsWith(`${href}/`);
+  }
 
   return (
-    <aside className="min-h-screen w-64 bg-slate-900 p-6 text-white">
-      <h1 className="mb-8 text-2xl font-bold">
-        🎛️ Church Tech Manager
-      </h1>
+    <aside className="sticky top-0 flex h-screen w-72 shrink-0 flex-col overflow-hidden border-r border-slate-300 bg-slate-200 shadow-[8px_0_24px_rgba(15,23,42,0.08)]">
+      <div className="shrink-0 p-5">
+        <Link
+          href="/"
+          className="flex items-center gap-3 rounded-2xl bg-white p-4 shadow-sm outline-none transition hover:shadow-md focus-visible:ring-4 focus-visible:ring-blue-200"
+        >
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-600 text-sm font-black tracking-tight text-white shadow-lg shadow-blue-900/20">
+            CT
+          </div>
 
-      <nav className="space-y-2">
-        {menuItems.map((item) => {
-          const isActive =
-            pathname === item.href ||
-            (item.href !== "/" &&
-              pathname.startsWith(item.href));
+          <div className="min-w-0">
+            <p className="truncate text-[15px] font-extrabold leading-tight text-slate-950">
+              Church Tech Manager
+            </p>
 
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={`block rounded-lg p-3 transition ${
-                isActive
-                  ? "bg-blue-600 text-white"
-                  : "hover:bg-slate-800"
-              }`}
-            >
-              <span className="mr-2">{item.icon}</span>
-              {item.name}
-            </Link>
-          );
-        })}
-      </nav>
+            <p className="mt-1 truncate text-xs font-semibold text-slate-500">
+              Production Operations
+            </p>
+          </div>
+        </Link>
+      </div>
+
+      <div className="min-h-0 flex-1 px-4 pb-4">
+        <nav
+          aria-label="Main navigation"
+          className="h-full overflow-y-auto overscroll-contain rounded-3xl border border-slate-300 bg-slate-100 p-4 shadow-inner [scrollbar-color:#94a3b8_transparent] [scrollbar-width:thin] [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-400 [&::-webkit-scrollbar-track]:bg-transparent"
+        >
+          <div className="space-y-8 pb-4">
+            {sections.map((section) => (
+              <section key={section.label}>
+                <p className="mb-3 px-2 text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500">
+                  {section.label}
+                </p>
+
+                <div className="space-y-1">
+                  {section.items.map((item) => {
+                    const Icon = item.icon;
+                    const active = isActive(item.href);
+
+                    return (
+                      <Link
+                        key={item.href}
+                        href={item.href}
+                        aria-current={active ? "page" : undefined}
+                        className={`group relative flex min-h-12 items-center gap-3 overflow-hidden rounded-xl px-3 py-3 text-sm font-semibold outline-none transition focus-visible:ring-4 focus-visible:ring-blue-200 ${
+                          active
+                            ? "bg-white text-blue-700 shadow-md shadow-slate-900/10"
+                            : "text-slate-700 hover:bg-white hover:text-slate-950 hover:shadow-sm"
+                        }`}
+                      >
+                        {active && (
+                          <span className="absolute inset-y-2 left-0 w-1 rounded-r-full bg-blue-600" />
+                        )}
+
+                        <span
+                          className={`ml-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition ${
+                            active
+                              ? "bg-blue-100 text-blue-700"
+                              : "bg-white text-slate-500 shadow-sm group-hover:text-slate-800"
+                          }`}
+                        >
+                          <Icon size={18} strokeWidth={2.1} />
+                        </span>
+
+                        <span className="min-w-0 flex-1 truncate">
+                          {item.name}
+                        </span>
+
+                        <ChevronRight
+                          size={16}
+                          className={`shrink-0 transition ${
+                            active
+                              ? "translate-x-0 text-blue-500 opacity-100"
+                              : "-translate-x-1 text-slate-400 opacity-0 group-hover:translate-x-0 group-hover:opacity-100"
+                          }`}
+                        />
+                      </Link>
+                    );
+                  })}
+                </div>
+              </section>
+            ))}
+          </div>
+        </nav>
+      </div>
+
+      <div className="shrink-0 border-t border-slate-300 bg-slate-200 p-4">
+        <div className="rounded-2xl bg-white p-4 shadow-sm">
+          <div className="flex items-center gap-3">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-slate-900 text-white">
+              <UserRound size={18} strokeWidth={2.1} />
+            </div>
+
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-bold text-slate-950">
+                Christian Baker
+              </p>
+
+              <p className="mt-0.5 truncate text-xs font-semibold text-slate-500">
+                Administrator
+              </p>
+            </div>
+          </div>
+
+          <Link
+            href="/settings"
+            className="mt-4 flex items-center justify-center gap-2 rounded-xl bg-slate-100 px-3 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-200 hover:text-slate-950 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-blue-200"
+          >
+            <Settings size={15} />
+            Manage Settings
+          </Link>
+        </div>
+      </div>
     </aside>
   );
 }
