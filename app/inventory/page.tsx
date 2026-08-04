@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { Eye } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import EmptyState from "@/components/ui/EmptyState";
 import { supabase } from "@/lib/supabase";
@@ -233,6 +234,10 @@ export default function InventoryPage() {
         </div>
 
         <div className="flex flex-wrap gap-3">
+          <Link href="/tools/import">
+            <Button variant="outline">Import CSV</Button>
+          </Link>
+
           <Link href="/tools/export">
             <Button variant="outline">Export Center</Button>
           </Link>
@@ -517,9 +522,10 @@ export default function InventoryPage() {
                     <td className="px-6 py-5 text-right">
                       <Link
                         href={`/inventory/${item.id}`}
-                        className="inline-flex items-center rounded-lg px-3 py-2 text-sm font-semibold text-blue-600 transition hover:bg-blue-50 hover:text-blue-700"
+                        className="inline-flex items-center gap-2 whitespace-nowrap rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700"
                       >
-                        View Equipment →
+                        <Eye className="h-4 w-4" />
+                        View
                       </Link>
                     </td>
                   </tr>

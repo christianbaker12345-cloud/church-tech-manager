@@ -15,6 +15,7 @@ import {
   Package,
   Settings,
   SlidersHorizontal,
+  Upload,
   UserRound,
   Wrench,
 } from "lucide-react";
@@ -90,6 +91,11 @@ const sections: NavigationSection[] = [
         icon: BarChart3,
       },
       {
+        name: "Import Center",
+        href: "/tools/import",
+        icon: Upload,
+      },
+      {
         name: "Export Center",
         href: "/tools/export",
         icon: Download,
@@ -115,24 +121,28 @@ export function AppSidebar() {
   }
 
   return (
-    <aside className="sticky top-0 flex h-screen w-72 shrink-0 flex-col overflow-hidden border-r border-slate-300 bg-slate-200 shadow-[8px_0_24px_rgba(15,23,42,0.08)]">
+    <aside className="sticky top-0 flex h-screen w-80 shrink-0 flex-col overflow-hidden border-r border-slate-300 bg-slate-200 shadow-[8px_0_24px_rgba(15,23,42,0.08)]">
       <div className="shrink-0 p-5">
         <Link
           href="/"
-          className="flex items-center gap-3 rounded-2xl bg-white p-4 shadow-sm outline-none transition hover:shadow-md focus-visible:ring-4 focus-visible:ring-blue-200"
+          className="group flex items-center gap-4 rounded-3xl border border-white/80 bg-white px-5 py-5 shadow-sm outline-none transition hover:-translate-y-0.5 hover:shadow-lg focus-visible:ring-4 focus-visible:ring-blue-200"
         >
-          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-600 text-sm font-black tracking-tight text-white shadow-lg shadow-blue-900/20">
+          <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-600 text-base font-black tracking-tight text-white shadow-lg shadow-blue-900/20 transition group-hover:scale-[1.03]">
             CT
           </div>
 
-          <div className="min-w-0">
-            <p className="truncate text-[15px] font-extrabold leading-tight text-slate-950">
+          <div className="min-w-0 flex-1">
+            <p className="text-[16px] font-extrabold leading-tight text-slate-950">
               Church Tech Manager
             </p>
 
-            <p className="mt-1 truncate text-xs font-semibold text-slate-500">
-              Production Operations
-            </p>
+            <div className="mt-2 flex items-center gap-2">
+              <span className="h-2 w-2 rounded-full bg-emerald-500 shadow-sm shadow-emerald-500/40" />
+
+              <p className="text-xs font-semibold text-slate-500">
+                Production Operations
+              </p>
+            </div>
           </div>
         </Link>
       </div>
@@ -202,7 +212,7 @@ export function AppSidebar() {
       </div>
 
       <div className="shrink-0 border-t border-slate-300 bg-slate-200 p-4">
-        <div className="rounded-2xl bg-white p-4 shadow-sm">
+        <div className="rounded-2xl border border-white/80 bg-white p-4 shadow-sm">
           <div className="flex items-center gap-3">
             <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-slate-900 text-white">
               <UserRound size={18} strokeWidth={2.1} />
