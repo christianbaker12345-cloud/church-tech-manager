@@ -4,17 +4,13 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { LucideIcon } from "lucide-react";
 import {
-  Activity,
   ArrowLeftRight,
-  BarChart3,
-  CalendarDays,
   ChevronRight,
   ClipboardCheck,
   Download,
   Gauge,
+  MapPin,
   Package,
-  Settings,
-  SlidersHorizontal,
   Upload,
   UserRound,
   Wrench,
@@ -40,11 +36,6 @@ const sections: NavigationSection[] = [
         href: "/",
         icon: Gauge,
       },
-      {
-        name: "Operations Center",
-        href: "/operations",
-        icon: Activity,
-      },
     ],
   },
   {
@@ -54,6 +45,11 @@ const sections: NavigationSection[] = [
         name: "Inventory",
         href: "/inventory",
         icon: Package,
+      },
+      {
+        name: "Locations",
+        href: "/locations",
+        icon: MapPin,
       },
       {
         name: "Transfers",
@@ -66,16 +62,6 @@ const sections: NavigationSection[] = [
         icon: Wrench,
       },
       {
-        name: "Events",
-        href: "/events",
-        icon: CalendarDays,
-      },
-      {
-        name: "Kits & Racks",
-        href: "/kits",
-        icon: SlidersHorizontal,
-      },
-      {
         name: "Check In / Out",
         href: "/checkin",
         icon: ClipboardCheck,
@@ -83,13 +69,8 @@ const sections: NavigationSection[] = [
     ],
   },
   {
-    label: "Management",
+    label: "Data Tools",
     items: [
-      {
-        name: "Reports",
-        href: "/reports",
-        icon: BarChart3,
-      },
       {
         name: "Import Center",
         href: "/tools/import",
@@ -99,11 +80,6 @@ const sections: NavigationSection[] = [
         name: "Export Center",
         href: "/tools/export",
         icon: Download,
-      },
-      {
-        name: "Settings",
-        href: "/settings",
-        icon: Settings,
       },
     ],
   },
@@ -133,7 +109,7 @@ export function AppSidebar() {
 
           <div className="min-w-0 flex-1">
             <p className="text-[16px] font-extrabold leading-tight text-slate-950">
-              Church Tech Manager
+              Tech Steward
             </p>
 
             <div className="mt-2 flex items-center gap-2">
@@ -228,14 +204,6 @@ export function AppSidebar() {
               </p>
             </div>
           </div>
-
-          <Link
-            href="/settings"
-            className="mt-4 flex items-center justify-center gap-2 rounded-xl bg-slate-100 px-3 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-200 hover:text-slate-950 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-blue-200"
-          >
-            <Settings size={15} />
-            Manage Settings
-          </Link>
         </div>
       </div>
     </aside>

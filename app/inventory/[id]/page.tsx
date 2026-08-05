@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { QRCodeSVG } from "qrcode.react";
+import { Archive, Check, Pencil, RotateCcw, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/lib/supabase";
 
@@ -19,7 +20,20 @@ type Equipment = {
   ministry: string | null;
   checkout_date: string | null;
   due_date: string | null;
+  retired_at: string | null;
+  retired_reason: string | null;
+  retired_destination: string | null;
+  retired_notes: string | null;
+  trashed_at: string | null;
+  trash_purge_after: string | null;
+  trash_reason: string | null;
 };
+
+type EditableEquipmentField =
+  | "category"
+  | "quantity"
+  | "location"
+  | "notes";
 
 type Asset = {
   id: string;
@@ -38,6 +52,7 @@ type Asset = {
 
 export default function EquipmentDetailsPage() {
   const params = useParams();
+  const router = useRouter();
 
   const equipmentId = Array.isArray(params.id)
     ? params.id[0]
@@ -57,6 +72,26 @@ export default function EquipmentDetailsPage() {
   const [checkedOutBy, setCheckedOutBy] = useState("");
   const [ministry, setMinistry] = useState("");
   const [dueDate, setDueDate] = useState("");
+
+  const [editingField, setEditingField] =
+    useState<EditableEquipmentField | null>(null);
+  const [draftValue, setDraftValue] = useState("");
+  const [savingField, setSavingField] =
+    useState<EditableEquipmentField | null>(null);
+  const [inlineEditError, setInlineEditError] = useState("");
+
+  const [showRetireDialog, setShowRetireDialog] = useState(false);
+  const [retireReason, setRetireReason] = useState("");
+  const [retireDestination, setRetireDestination] = useState("");
+  const [retireNotes, setRetireNotes] = useState("");
+  const [retiring, setRetiring] = useState(false);
+
+  const [showTrashDialog, setShowTrashDialog] = useState(false);
+  const [trashReason, setTrashReason] = useState("");
+  const [trashConfirmation, setTrashConfirmation] = useState("");
+  const [trashing, setTrashing] = useState(false);
+  const [restoringRetired, setRestoringRetired] = useState(false);
+  const [restoringTrash, setRestoringTrash] = useState(false);
 
   useEffect(() => {
     if (equipmentId) {
@@ -374,6 +409,320 @@ export default function EquipmentDetailsPage() {
     await loadPage();
   }
 
+  function beginInlineEdit(field: EditableEquipmentField) {
+    if (!item) return;
+
+    const currentValue =
+      field === "quantity"
+        ? String(Math.max(Number(item.quantity) || 0, 0))
+        : item[field] ?? "";
+
+    setInlineEditError("");
+    setDraftValue(currentValue);
+    setEditingField(field);
+  }
+
+  function cancelInlineEdit() {
+    setInlineEditError("");
+    setDraftValue("");
+    setEditingField(null);
+  }
+
+  async function saveInlineField(field: EditableEquipmentField) {
+    if (!item || !equipmentId) return;
+
+    setInlineEditError("");
+    setSavingField(field);
+
+    let databaseValue: string | number | null =
+      draftValue.trim() || null;
+
+    if (field === "quantity") {
+      const parsedQuantity = Number(draftValue);
+
+      if (
+        !Number.isInteger(parsedQuantity) ||
+        parsedQuantity < 0
+      ) {
+        setInlineEditError(
+          "Quantity must be a whole number of zero or greater."
+        );
+        setSavingField(null);
+        return;
+      }
+
+      if (parsedQuantity < assets.length) {
+        setInlineEditError(
+          `Quantity cannot be lower than the ${assets.length} individual assets already created.`
+        );
+        setSavingField(null);
+        return;
+      }
+
+      databaseValue = parsedQuantity;
+    }
+
+    const { error } = await supabase
+      .from("equipment")
+      .update({
+        [field]: databaseValue,
+      })
+      .eq("id", equipmentId);
+
+    if (error) {
+      console.error(
+        `Equipment ${field} update error:`,
+        error
+      );
+      setInlineEditError(error.message);
+      setSavingField(null);
+      return;
+    }
+
+    setItem((currentItem) =>
+      currentItem
+        ? {
+            ...currentItem,
+            [field]: databaseValue,
+          }
+        : currentItem
+    );
+
+    setSavingField(null);
+    setEditingField(null);
+    setDraftValue("");
+  }
+
+  async function retireEquipment() {
+    if (!item || !equipmentId) return;
+
+    if (!retireReason) {
+      alert("Choose a reason for retiring this equipment.");
+      return;
+    }
+
+    setRetiring(true);
+
+    const { error } = await supabase
+      .from("equipment")
+      .update({
+        retired_at: new Date().toISOString(),
+        retired_reason: retireReason,
+        retired_destination: retireDestination.trim() || null,
+        retired_notes: retireNotes.trim() || null,
+        status: "Retired",
+        trashed_at: null,
+        trash_purge_after: null,
+        trash_reason: null,
+      })
+      .eq("id", equipmentId);
+
+    setRetiring(false);
+
+    if (error) {
+      console.error("Equipment retirement error:", error);
+      alert(error.message);
+      return;
+    }
+
+    const { error: historyError } = await supabase
+      .from("equipment_lifecycle_history")
+      .insert({
+        equipment_id: equipmentId,
+        action: "Retired",
+        reason: retireReason,
+        destination: retireDestination.trim() || null,
+        notes: retireNotes.trim() || null,
+      });
+
+    if (historyError) {
+      console.error("Retirement history error:", historyError);
+      alert(
+        `The equipment was retired, but its history entry could not be saved:\n\n${historyError.message}`
+      );
+    }
+
+    setShowRetireDialog(false);
+    setRetireReason("");
+    setRetireDestination("");
+    setRetireNotes("");
+
+    await loadPage();
+  }
+
+  async function moveEquipmentToTrash() {
+    if (!item || !equipmentId) return;
+
+    if (!trashReason.trim()) {
+      alert("Enter why this equipment is being moved to Trash.");
+      return;
+    }
+
+    if (trashConfirmation.trim().toUpperCase() !== "TRASH") {
+      alert('Type "TRASH" to confirm.');
+      return;
+    }
+
+    setTrashing(true);
+
+    const trashedAt = new Date();
+    const purgeAfter = new Date(trashedAt);
+    purgeAfter.setDate(purgeAfter.getDate() + 30);
+
+    const { error } = await supabase
+      .from("equipment")
+      .update({
+        trashed_at: trashedAt.toISOString(),
+        trash_purge_after: purgeAfter.toISOString(),
+        trash_reason: trashReason.trim(),
+      })
+      .eq("id", equipmentId);
+
+    setTrashing(false);
+
+    if (error) {
+      console.error("Equipment trash error:", error);
+      alert(error.message);
+      return;
+    }
+
+    const { error: historyError } = await supabase
+      .from("equipment_lifecycle_history")
+      .insert({
+        equipment_id: equipmentId,
+        action: "Moved to Trash",
+        reason: trashReason.trim(),
+        destination: null,
+        notes: `Scheduled for permanent deletion after ${purgeAfter.toLocaleDateString(
+          "en-US"
+        )}.`,
+      });
+
+    if (historyError) {
+      console.error("Trash history error:", historyError);
+      alert(
+        `The equipment was moved to Trash, but its history entry could not be saved:\n\n${historyError.message}`
+      );
+    }
+
+    router.push("/inventory");
+    router.refresh();
+  }
+
+  async function restoreRetiredEquipment() {
+    if (!item || !equipmentId) return;
+
+    const confirmed = window.confirm(
+      `Restore ${item.name} to active inventory?`
+    );
+
+    if (!confirmed) return;
+
+    setRestoringRetired(true);
+
+    const { error } = await supabase
+      .from("equipment")
+      .update({
+        retired_at: null,
+        retired_reason: null,
+        retired_destination: null,
+        retired_notes: null,
+        status: "Available",
+      })
+      .eq("id", equipmentId);
+
+    setRestoringRetired(false);
+
+    if (error) {
+      console.error("Equipment restore error:", error);
+      alert(error.message);
+      return;
+    }
+
+    const { error: historyError } = await supabase
+      .from("equipment_lifecycle_history")
+      .insert({
+        equipment_id: equipmentId,
+        action: "Restored to Active Inventory",
+        reason: null,
+        destination: null,
+        notes: "Previously retired equipment was restored.",
+      });
+
+    if (historyError) {
+      console.error("Restore history error:", historyError);
+      alert(
+        `The equipment was restored, but its history entry could not be saved:\n\n${historyError.message}`
+      );
+    }
+
+    await loadPage();
+  }
+
+  async function restoreEquipmentFromTrash() {
+    if (!item || !equipmentId) return;
+
+    const confirmed = window.confirm(
+      `Restore ${item.name} from Trash?`
+    );
+
+    if (!confirmed) return;
+
+    setRestoringTrash(true);
+
+    const { error } = await supabase
+      .from("equipment")
+      .update({
+        trashed_at: null,
+        trash_purge_after: null,
+        trash_reason: null,
+      })
+      .eq("id", equipmentId);
+
+    setRestoringTrash(false);
+
+    if (error) {
+      console.error("Trash restore error:", error);
+      alert(error.message);
+      return;
+    }
+
+    const { error: historyError } = await supabase
+      .from("equipment_lifecycle_history")
+      .insert({
+        equipment_id: equipmentId,
+        action: "Restored from Trash",
+        reason: null,
+        destination: null,
+        notes: "Equipment record was restored before permanent deletion.",
+      });
+
+    if (historyError) {
+      console.error("Trash restore history error:", historyError);
+      alert(
+        `The equipment was restored from Trash, but its history entry could not be saved:\n\n${historyError.message}`
+      );
+    }
+
+    await loadPage();
+  }
+
+  function formatLifecycleDate(value: string | null) {
+    if (!value) return "Not recorded";
+
+    const parsedDate = new Date(value);
+
+    if (Number.isNaN(parsedDate.getTime())) {
+      return value;
+    }
+
+    return parsedDate.toLocaleDateString("en-US", {
+      month: "long",
+      day: "numeric",
+      year: "numeric",
+    });
+  }
+
   function printQRCode() {
     window.print();
   }
@@ -468,6 +817,126 @@ export default function EquipmentDetailsPage() {
             </span>
           </div>
 
+          {item.retired_at && (
+            <div className="mt-8 rounded-xl border border-violet-200 bg-violet-50 p-6">
+              <p className="text-sm font-bold uppercase tracking-[0.16em] text-violet-700">
+                Retired Equipment
+              </p>
+
+              <h2 className="mt-2 text-2xl font-bold text-violet-950">
+                This equipment was retired on{" "}
+                {formatLifecycleDate(item.retired_at)} and is no
+                longer part of the active inventory.
+              </h2>
+
+              <div className="mt-5 grid gap-4 md:grid-cols-3">
+                <div>
+                  <p className="text-sm font-medium text-violet-700">
+                    Retired On
+                  </p>
+                  <p className="mt-1 font-semibold text-violet-950">
+                    {formatLifecycleDate(item.retired_at)}
+                  </p>
+                </div>
+
+                <div>
+                  <p className="text-sm font-medium text-violet-700">
+                    Reason
+                  </p>
+                  <p className="mt-1 font-semibold text-violet-950">
+                    {item.retired_reason || "Not recorded"}
+                  </p>
+                </div>
+
+                <div>
+                  <p className="text-sm font-medium text-violet-700">
+                    Destination
+                  </p>
+                  <p className="mt-1 font-semibold text-violet-950">
+                    {item.retired_destination || "Not recorded"}
+                  </p>
+                </div>
+              </div>
+
+              {item.retired_notes && (
+                <div className="mt-5 rounded-xl border border-violet-200 bg-white/60 p-4">
+                  <p className="text-sm font-medium text-violet-700">
+                    Retirement Notes
+                  </p>
+
+                  <p className="mt-2 whitespace-pre-wrap text-violet-950">
+                    {item.retired_notes}
+                  </p>
+                </div>
+              )}
+
+              {!item.trashed_at && (
+                <div className="mt-5">
+                  <Button
+                    variant="outline"
+                    onClick={restoreRetiredEquipment}
+                    disabled={restoringRetired}
+                    className="border-violet-300 bg-white text-violet-700 hover:bg-violet-100 hover:text-violet-900"
+                  >
+                    <RotateCcw className="h-4 w-4" />
+                    {restoringRetired
+                      ? "Restoring..."
+                      : "Restore to Active Inventory"}
+                  </Button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {item.trashed_at && (
+            <div className="mt-8 rounded-xl border border-rose-200 bg-rose-50 p-6">
+              <p className="text-sm font-bold uppercase tracking-[0.16em] text-rose-700">
+                In Trash
+              </p>
+
+              <h2 className="mt-2 text-2xl font-bold text-rose-950">
+                This record was moved to Trash on{" "}
+                {formatLifecycleDate(item.trashed_at)}.
+              </h2>
+
+              <div className="mt-5 grid gap-4 md:grid-cols-2">
+                <div>
+                  <p className="text-sm font-medium text-rose-700">
+                    Reason
+                  </p>
+
+                  <p className="mt-1 font-semibold text-rose-950">
+                    {item.trash_reason || "Not recorded"}
+                  </p>
+                </div>
+
+                <div>
+                  <p className="text-sm font-medium text-rose-700">
+                    Scheduled Purge
+                  </p>
+
+                  <p className="mt-1 font-semibold text-rose-950">
+                    {formatLifecycleDate(item.trash_purge_after)}
+                  </p>
+                </div>
+              </div>
+
+              <div className="mt-5">
+                <Button
+                  variant="outline"
+                  onClick={restoreEquipmentFromTrash}
+                  disabled={restoringTrash}
+                  className="border-rose-300 bg-white text-rose-700 hover:bg-rose-100 hover:text-rose-900"
+                >
+                  <RotateCcw className="h-4 w-4" />
+                  {restoringTrash
+                    ? "Restoring..."
+                    : "Restore from Trash"}
+                </Button>
+              </div>
+            </div>
+          )}
+
           {equipmentIsCheckedOut && (
             <div className="mt-8 rounded-xl border border-yellow-300 bg-yellow-50 p-6">
               <h2 className="text-xl font-bold text-yellow-900">
@@ -518,38 +987,59 @@ export default function EquipmentDetailsPage() {
             </div>
           )}
 
+          {inlineEditError && (
+            <div className="mt-8 rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm font-medium text-rose-700">
+              {inlineEditError}
+            </div>
+          )}
+
           <div className="mt-10 grid gap-6 md:grid-cols-2">
-            <div className="rounded-xl border p-5">
-              <p className="text-sm text-gray-500">
-                Category
-              </p>
+            <EditableEquipmentCard
+              label="Category"
+              value={item.category || "—"}
+              field="category"
+              inputType="text"
+              placeholder="Enter category"
+              editing={editingField === "category"}
+              saving={savingField === "category"}
+              draftValue={draftValue}
+              onEdit={() => beginInlineEdit("category")}
+              onDraftChange={setDraftValue}
+              onSave={() => saveInlineField("category")}
+              onCancel={cancelInlineEdit}
+            />
 
-              <p className="mt-1 text-xl font-semibold">
-                {item.category || "—"}
-              </p>
-            </div>
+            <EditableEquipmentCard
+              label="Quantity"
+              value={String(quantity)}
+              field="quantity"
+              inputType="number"
+              placeholder="0"
+              editing={editingField === "quantity"}
+              saving={savingField === "quantity"}
+              draftValue={draftValue}
+              onEdit={() => beginInlineEdit("quantity")}
+              onDraftChange={setDraftValue}
+              onSave={() => saveInlineField("quantity")}
+              onCancel={cancelInlineEdit}
+            />
 
-            <div className="rounded-xl border p-5">
-              <p className="text-sm text-gray-500">
-                Quantity
-              </p>
+            <EditableEquipmentCard
+              label="Location"
+              value={item.location || "—"}
+              field="location"
+              inputType="text"
+              placeholder="Enter location"
+              editing={editingField === "location"}
+              saving={savingField === "location"}
+              draftValue={draftValue}
+              onEdit={() => beginInlineEdit("location")}
+              onDraftChange={setDraftValue}
+              onSave={() => saveInlineField("location")}
+              onCancel={cancelInlineEdit}
+            />
 
-              <p className="mt-1 text-xl font-semibold">
-                {quantity}
-              </p>
-            </div>
-
-            <div className="rounded-xl border p-5">
-              <p className="text-sm text-gray-500">
-                Location
-              </p>
-
-              <p className="mt-1 text-xl font-semibold">
-                {item.location || "—"}
-              </p>
-            </div>
-
-            <div className="rounded-xl border p-5">
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-5">
               <p className="text-sm text-gray-500">
                 Individual Assets
               </p>
@@ -557,18 +1047,23 @@ export default function EquipmentDetailsPage() {
               <p className="mt-1 text-xl font-semibold">
                 {assets.length}
               </p>
+
+              <p className="mt-3 text-xs font-medium text-slate-400">
+                Calculated automatically
+              </p>
             </div>
           </div>
 
-          <div className="mt-8 rounded-xl border p-6">
-            <h2 className="text-xl font-bold">
-              Notes
-            </h2>
-
-            <p className="mt-3 text-gray-700">
-              {item.notes || "No notes available."}
-            </p>
-          </div>
+          <EditableNotesCard
+            value={item.notes || "No notes available."}
+            editing={editingField === "notes"}
+            saving={savingField === "notes"}
+            draftValue={draftValue}
+            onEdit={() => beginInlineEdit("notes")}
+            onDraftChange={setDraftValue}
+            onSave={() => saveInlineField("notes")}
+            onCancel={cancelInlineEdit}
+          />
 
           <div className="mt-8 flex flex-wrap gap-4">
             <Link href={`/inventory/${item.id}/edit`}>
@@ -608,6 +1103,27 @@ export default function EquipmentDetailsPage() {
             >
               Print QR Code
             </Button>
+
+            {!item.retired_at && !item.trashed_at && (
+              <Button
+                variant="outline"
+                onClick={() => setShowRetireDialog(true)}
+              >
+                <Archive className="h-4 w-4" />
+                Retire Equipment
+              </Button>
+            )}
+
+            {!item.trashed_at && (
+              <Button
+                variant="outline"
+                onClick={() => setShowTrashDialog(true)}
+                className="border-rose-200 text-rose-700 hover:bg-rose-50 hover:text-rose-800"
+              >
+                <Trash2 className="h-4 w-4" />
+                Move to Trash
+              </Button>
+            )}
           </div>
 
           <p className="mt-4 text-sm text-gray-500">
@@ -722,6 +1238,198 @@ export default function EquipmentDetailsPage() {
           </p>
         </div>
       </div>
+
+      {showRetireDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 p-4 backdrop-blur-sm">
+          <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-3xl bg-white shadow-2xl">
+            <div className="border-b border-slate-200 bg-slate-50 p-6 md:p-8">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <h2 className="text-3xl font-bold text-slate-950">
+                    Retire Equipment
+                  </h2>
+                  <p className="mt-2 leading-7 text-slate-600">
+                    Preserve what happened to this equipment and where it went.
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setShowRetireDialog(false)}
+                  className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+            </div>
+
+            <div className="space-y-6 p-6 md:p-8">
+              <div className="rounded-xl border border-violet-200 bg-violet-50 p-4">
+                <p className="text-sm font-medium text-violet-700">
+                  Retired On
+                </p>
+
+                <p className="mt-1 text-lg font-bold text-violet-950">
+                  {new Date().toLocaleDateString("en-US", {
+                    month: "long",
+                    day: "numeric",
+                    year: "numeric",
+                  })}
+                </p>
+
+                <p className="mt-1 text-sm text-violet-700">
+                  This date is added automatically when you retire the
+                  equipment.
+                </p>
+              </div>
+
+              <div>
+                <label className="mb-2 block font-semibold">
+                  Reason
+                </label>
+                <select
+                  value={retireReason}
+                  onChange={(event) => setRetireReason(event.target.value)}
+                  className="w-full rounded-xl border p-3"
+                >
+                  <option value="">Choose a reason</option>
+                  <option value="Sold">Sold</option>
+                  <option value="Donated">Donated</option>
+                  <option value="Disposed">Disposed</option>
+                  <option value="Replaced">Replaced</option>
+                  <option value="Transferred">Transferred</option>
+                  <option value="Lost or Stolen">Lost or Stolen</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="mb-2 block font-semibold">
+                  Where did it go?
+                </label>
+                <input
+                  value={retireDestination}
+                  onChange={(event) => setRetireDestination(event.target.value)}
+                  placeholder="Sold to, donated to, transferred to..."
+                  className="w-full rounded-xl border p-3"
+                />
+              </div>
+
+              <div>
+                <label className="mb-2 block font-semibold">
+                  Notes
+                </label>
+                <textarea
+                  rows={5}
+                  value={retireNotes}
+                  onChange={(event) => setRetireNotes(event.target.value)}
+                  placeholder="Explain what happened."
+                  className="w-full rounded-xl border p-3"
+                />
+              </div>
+
+              <div className="flex justify-end gap-3">
+                <Button
+                  variant="outline"
+                  onClick={() => setShowRetireDialog(false)}
+                  disabled={retiring}
+                >
+                  Cancel
+                </Button>
+
+                <Button
+                  onClick={retireEquipment}
+                  disabled={retiring || !retireReason}
+                >
+                  <Archive className="h-4 w-4" />
+                  {retiring ? "Retiring..." : "Retire Equipment"}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showTrashDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 p-4 backdrop-blur-sm">
+          <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-3xl bg-white shadow-2xl">
+            <div className="border-b border-rose-200 bg-rose-50 p-6 md:p-8">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <h2 className="text-3xl font-bold text-rose-950">
+                    Move Equipment to Trash
+                  </h2>
+                  <p className="mt-2 leading-7 text-rose-700">
+                    Use this for duplicates, mistakes, test records, or bad imports.
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setShowTrashDialog(false)}
+                  className="flex h-10 w-10 items-center justify-center rounded-xl border border-rose-200 bg-white text-rose-600"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+            </div>
+
+            <div className="space-y-6 p-6 md:p-8">
+              <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+                Retire equipment instead if you need to preserve the story of something the church owned or used.
+              </div>
+
+              <div>
+                <label className="mb-2 block font-semibold">
+                  Why are you deleting this record?
+                </label>
+                <textarea
+                  rows={4}
+                  value={trashReason}
+                  onChange={(event) => setTrashReason(event.target.value)}
+                  placeholder="Duplicate record, test entry, incorrect import..."
+                  className="w-full rounded-xl border p-3"
+                />
+              </div>
+
+              <div>
+                <label className="mb-2 block font-semibold">
+                  Type TRASH to confirm
+                </label>
+                <input
+                  value={trashConfirmation}
+                  onChange={(event) => setTrashConfirmation(event.target.value)}
+                  placeholder="TRASH"
+                  className="w-full rounded-xl border p-3 font-mono font-bold uppercase"
+                />
+              </div>
+
+              <div className="flex justify-end gap-3">
+                <Button
+                  variant="outline"
+                  onClick={() => setShowTrashDialog(false)}
+                  disabled={trashing}
+                >
+                  Cancel
+                </Button>
+
+                <Button
+                  onClick={moveEquipmentToTrash}
+                  disabled={
+                    trashing ||
+                    !trashReason.trim() ||
+                    trashConfirmation.trim().toUpperCase() !== "TRASH"
+                  }
+                  className="bg-rose-600 hover:bg-rose-700"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  {trashing ? "Moving..." : "Move to Trash"}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="mt-8 rounded-2xl bg-white p-8 shadow">
         <div className="flex flex-wrap items-center justify-between gap-5">
@@ -852,5 +1560,216 @@ export default function EquipmentDetailsPage() {
         )}
       </div>
     </div>
+  );
+}
+
+type EditableEquipmentCardProps = {
+  label: string;
+  value: string;
+  field: EditableEquipmentField;
+  inputType: "text" | "number";
+  placeholder: string;
+  editing: boolean;
+  saving: boolean;
+  draftValue: string;
+  onEdit: () => void;
+  onDraftChange: (value: string) => void;
+  onSave: () => void;
+  onCancel: () => void;
+};
+
+function EditableEquipmentCard({
+  label,
+  value,
+  field,
+  inputType,
+  placeholder,
+  editing,
+  saving,
+  draftValue,
+  onEdit,
+  onDraftChange,
+  onSave,
+  onCancel,
+}: EditableEquipmentCardProps) {
+  if (editing) {
+    return (
+      <div className="rounded-xl border border-blue-300 bg-blue-50 p-5 ring-4 ring-blue-100">
+        <div className="flex items-center justify-between gap-3">
+          <label className="text-sm font-semibold text-slate-700">
+            {label}
+          </label>
+
+          <span className="rounded-full bg-blue-100 px-2.5 py-1 text-xs font-bold text-blue-700">
+            Editing
+          </span>
+        </div>
+
+        <input
+          type={inputType}
+          min={field === "quantity" ? "0" : undefined}
+          step={field === "quantity" ? "1" : undefined}
+          value={draftValue}
+          placeholder={placeholder}
+          autoFocus
+          onChange={(event) =>
+            onDraftChange(event.target.value)
+          }
+          onKeyDown={(event) => {
+            if (event.key === "Enter") {
+              onSave();
+            }
+
+            if (event.key === "Escape") {
+              onCancel();
+            }
+          }}
+          className="mt-3 w-full rounded-lg border border-blue-300 bg-white p-3 text-lg font-semibold outline-none focus:ring-4 focus:ring-blue-100"
+        />
+
+        <div className="mt-4 flex gap-2">
+          <button
+            type="button"
+            onClick={onSave}
+            disabled={saving}
+            className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg bg-blue-600 px-3 py-2 text-sm font-bold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            <Check className="h-4 w-4" />
+            {saving ? "Saving..." : "Save"}
+          </button>
+
+          <button
+            type="button"
+            onClick={onCancel}
+            disabled={saving}
+            aria-label={`Cancel editing ${label}`}
+            className="inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-600 transition hover:bg-slate-100 disabled:opacity-60"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={onEdit}
+      className="group rounded-xl border border-slate-200 bg-white p-5 text-left transition hover:-translate-y-0.5 hover:border-blue-300 hover:bg-blue-50/30 hover:shadow-md focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-blue-100"
+    >
+      <div className="flex items-start justify-between gap-3">
+        <p className="text-sm text-gray-500">
+          {label}
+        </p>
+
+        <Pencil className="h-4 w-4 text-slate-300 transition group-hover:text-blue-600" />
+      </div>
+
+      <p className="mt-1 break-words text-xl font-semibold">
+        {value}
+      </p>
+
+      <p className="mt-3 text-xs font-semibold text-blue-600 opacity-0 transition group-hover:opacity-100">
+        Click to edit
+      </p>
+    </button>
+  );
+}
+
+type EditableNotesCardProps = {
+  value: string;
+  editing: boolean;
+  saving: boolean;
+  draftValue: string;
+  onEdit: () => void;
+  onDraftChange: (value: string) => void;
+  onSave: () => void;
+  onCancel: () => void;
+};
+
+function EditableNotesCard({
+  value,
+  editing,
+  saving,
+  draftValue,
+  onEdit,
+  onDraftChange,
+  onSave,
+  onCancel,
+}: EditableNotesCardProps) {
+  if (editing) {
+    return (
+      <div className="mt-8 rounded-xl border border-blue-300 bg-blue-50 p-6 ring-4 ring-blue-100">
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-xl font-bold">
+            Notes
+          </h2>
+
+          <span className="rounded-full bg-blue-100 px-2.5 py-1 text-xs font-bold text-blue-700">
+            Editing
+          </span>
+        </div>
+
+        <textarea
+          rows={5}
+          value={draftValue}
+          autoFocus
+          placeholder="Add notes about this equipment record..."
+          onChange={(event) =>
+            onDraftChange(event.target.value)
+          }
+          onKeyDown={(event) => {
+            if (event.key === "Escape") {
+              onCancel();
+            }
+          }}
+          className="mt-4 w-full resize-y rounded-lg border border-blue-300 bg-white p-3 leading-7 text-slate-800 outline-none focus:ring-4 focus:ring-blue-100"
+        />
+
+        <div className="mt-4 flex justify-end gap-3">
+          <Button
+            variant="outline"
+            onClick={onCancel}
+            disabled={saving}
+          >
+            <X className="h-4 w-4" />
+            Cancel
+          </Button>
+
+          <Button
+            onClick={onSave}
+            disabled={saving}
+          >
+            <Check className="h-4 w-4" />
+            {saving ? "Saving..." : "Save Notes"}
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={onEdit}
+      className="group mt-8 w-full rounded-xl border border-slate-200 bg-white p-6 text-left transition hover:border-blue-300 hover:bg-blue-50/30 hover:shadow-md focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-blue-100"
+    >
+      <div className="flex items-center justify-between gap-3">
+        <h2 className="text-xl font-bold">
+          Notes
+        </h2>
+
+        <Pencil className="h-4 w-4 text-slate-300 transition group-hover:text-blue-600" />
+      </div>
+
+      <p className="mt-3 whitespace-pre-wrap text-gray-700">
+        {value}
+      </p>
+
+      <p className="mt-3 text-xs font-semibold text-blue-600 opacity-0 transition group-hover:opacity-100">
+        Click to edit
+      </p>
+    </button>
   );
 }

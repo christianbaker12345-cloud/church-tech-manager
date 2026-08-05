@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { Eye } from "lucide-react";
+import { Archive, Eye, PackageCheck, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import EmptyState from "@/components/ui/EmptyState";
 import { supabase } from "@/lib/supabase";
@@ -16,6 +16,21 @@ type Equipment = {
   location: string | null;
   notes: string | null;
   created_at?: string | null;
+  retired_at: string | null;
+  retired_reason: string | null;
+  retired_destination: string | null;
+  retired_notes: string | null;
+  trashed_at: string | null;
+  trash_purge_after: string | null;
+  trash_reason: string | null;
+};
+
+type LifecycleFilter = "Active" | "Retired" | "Trash";
+
+type LifecycleCounts = {
+  active: number;
+  retired: number;
+  trash: number;
 };
 
 function normalizeStatus(status: string | null) {
@@ -51,19 +66,74 @@ export default function InventoryPage() {
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("All");
   const [statusFilter, setStatusFilter] = useState("All");
+  const [lifecycleFilter, setLifecycleFilter] =
+    useState<LifecycleFilter>("Active");
+  const [lifecycleCounts, setLifecycleCounts] =
+    useState<LifecycleCounts>({
+      active: 0,
+      retired: 0,
+      trash: 0,
+    });
 
   useEffect(() => {
     loadEquipment();
-  }, []);
+  }, [lifecycleFilter]);
 
   async function loadEquipment() {
     setLoading(true);
     setErrorMessage("");
 
-    const { data, error } = await supabase
+    const [
+      activeCountResult,
+      retiredCountResult,
+      trashCountResult,
+    ] = await Promise.all([
+      supabase
+        .from("equipment")
+        .select("id", { count: "exact", head: true })
+        .is("retired_at", null)
+        .is("trashed_at", null),
+
+      supabase
+        .from("equipment")
+        .select("id", { count: "exact", head: true })
+        .not("retired_at", "is", null)
+        .is("trashed_at", null),
+
+      supabase
+        .from("equipment")
+        .select("id", { count: "exact", head: true })
+        .not("trashed_at", "is", null),
+    ]);
+
+    setLifecycleCounts({
+      active: activeCountResult.count ?? 0,
+      retired: retiredCountResult.count ?? 0,
+      trash: trashCountResult.count ?? 0,
+    });
+
+    let query = supabase
       .from("equipment")
       .select("*")
       .order("name", { ascending: true });
+
+    if (lifecycleFilter === "Active") {
+      query = query
+        .is("retired_at", null)
+        .is("trashed_at", null);
+    }
+
+    if (lifecycleFilter === "Retired") {
+      query = query
+        .not("retired_at", "is", null)
+        .is("trashed_at", null);
+    }
+
+    if (lifecycleFilter === "Trash") {
+      query = query.not("trashed_at", "is", null);
+    }
+
+    const { data, error } = await query;
 
     if (error) {
       console.error("Equipment load error:", error);
@@ -160,6 +230,13 @@ export default function InventoryPage() {
     setStatusFilter("All");
   }
 
+  function changeLifecycleFilter(nextFilter: LifecycleFilter) {
+    setLifecycleFilter(nextFilter);
+    setSearch("");
+    setCategoryFilter("All");
+    setStatusFilter("All");
+  }
+
   const hasActiveFilters =
     search.trim().length > 0 ||
     categoryFilter !== "All" ||
@@ -195,6 +272,51 @@ export default function InventoryPage() {
       valueClassName: "text-amber-700",
     },
   ];
+
+  const lifecycleTabs = [
+    {
+      label: "Active" as const,
+      count: lifecycleCounts.active,
+      icon: PackageCheck,
+      description: "Currently in service",
+    },
+    {
+      label: "Retired" as const,
+      count: lifecycleCounts.retired,
+      icon: Archive,
+      description: "History preserved",
+    },
+    {
+      label: "Trash" as const,
+      count: lifecycleCounts.trash,
+      icon: Trash2,
+      description: "Recoverable for 30 days",
+    },
+  ];
+
+  const lifecycleCopy = {
+    Active: {
+      eyebrow: "Active Inventory",
+      title: "Equipment records",
+      emptyTitle: "No active equipment found",
+      emptyDescription:
+        "Add equipment or adjust your search and filters.",
+    },
+    Retired: {
+      eyebrow: "Retired Equipment",
+      title: "Retired records",
+      emptyTitle: "No retired equipment found",
+      emptyDescription:
+        "Equipment you retire will remain searchable here.",
+    },
+    Trash: {
+      eyebrow: "Equipment Trash",
+      title: "Deleted records",
+      emptyTitle: "Trash is empty",
+      emptyDescription:
+        "Records moved to Trash will remain recoverable here for 30 days.",
+    },
+  }[lifecycleFilter];
 
   if (loading) {
     return (
@@ -292,6 +414,56 @@ export default function InventoryPage() {
               </p>
             </article>
           ))}
+        </div>
+      </section>
+
+      <section className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
+        <div className="grid gap-3 md:grid-cols-3">
+          {lifecycleTabs.map((tab) => {
+            const Icon = tab.icon;
+            const active = lifecycleFilter === tab.label;
+
+            return (
+              <button
+                key={tab.label}
+                type="button"
+                onClick={() => changeLifecycleFilter(tab.label)}
+                className={`flex items-center gap-4 rounded-xl border p-4 text-left transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-blue-100 ${
+                  active
+                    ? "border-blue-300 bg-blue-50 shadow-sm"
+                    : "border-transparent bg-slate-50 hover:border-slate-200 hover:bg-white"
+                }`}
+              >
+                <span
+                  className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${
+                    active
+                      ? "bg-blue-600 text-white"
+                      : "bg-white text-slate-500 shadow-sm"
+                  }`}
+                >
+                  <Icon className="h-5 w-5" />
+                </span>
+
+                <span className="min-w-0">
+                  <span
+                    className={`block text-base font-bold ${
+                      active ? "text-blue-950" : "text-slate-950"
+                    }`}
+                  >
+                    {tab.label} ({tab.count})
+                  </span>
+
+                  <span
+                    className={`mt-0.5 block text-sm ${
+                      active ? "text-blue-700" : "text-slate-500"
+                    }`}
+                  >
+                    {tab.description}
+                  </span>
+                </span>
+              </button>
+            );
+          })}
         </div>
       </section>
 
@@ -393,11 +565,11 @@ export default function InventoryPage() {
         <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-200 p-6 md:p-8">
           <div>
             <p className="text-sm font-semibold uppercase tracking-[0.16em] text-slate-500">
-              Equipment Catalog
+              {lifecycleCopy.eyebrow}
             </p>
 
             <h2 className="mt-2 text-2xl font-bold text-slate-950">
-              Equipment records
+              {lifecycleCopy.title}
             </h2>
 
             <p className="mt-2 text-slate-500">
@@ -411,8 +583,8 @@ export default function InventoryPage() {
           <div className="p-8 md:p-12">
             <EmptyState
               icon="📦"
-              title="No equipment found"
-              description="Add equipment or adjust your search and filters."
+              title={lifecycleCopy.emptyTitle}
+              description={lifecycleCopy.emptyDescription}
               secondaryAction={
                 hasActiveFilters
                   ? {
@@ -422,10 +594,14 @@ export default function InventoryPage() {
                     }
                   : undefined
               }
-              primaryAction={{
-                label: "Add Equipment",
-                href: "/inventory/new",
-              }}
+              primaryAction={
+                lifecycleFilter === "Active"
+                  ? {
+                      label: "Add Equipment",
+                      href: "/inventory/new",
+                    }
+                  : undefined
+              }
             />
           </div>
         ) : (
@@ -483,6 +659,21 @@ export default function InventoryPage() {
                           ) : (
                             <p className="mt-1 text-sm text-slate-400">
                               No notes
+                            </p>
+                          )}
+
+                          {lifecycleFilter === "Retired" && (
+                            <p className="mt-2 text-xs font-semibold text-violet-700">
+                              {item.retired_reason || "Retired"}
+                              {item.retired_destination
+                                ? ` · ${item.retired_destination}`
+                                : ""}
+                            </p>
+                          )}
+
+                          {lifecycleFilter === "Trash" && (
+                            <p className="mt-2 text-xs font-semibold text-rose-700">
+                              {item.trash_reason || "Moved to Trash"}
                             </p>
                           )}
                         </div>
