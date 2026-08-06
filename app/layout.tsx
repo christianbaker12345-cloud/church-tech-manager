@@ -11,7 +11,8 @@ const manrope = Manrope({
 
 export const metadata: Metadata = {
   title: "Tech Steward",
-  description: "Equipment management for churches and production teams.",
+  description:
+    "Equipment management for churches and production teams.",
 };
 
 export default function RootLayout({
@@ -24,11 +25,11 @@ export default function RootLayout({
       <body
         className={`${manrope.variable} bg-slate-50 font-sans antialiased`}
       >
-        <div className="flex min-h-screen">
+        <div className="min-h-screen lg:flex">
           <AppSidebar />
 
-          <main className="min-w-0 flex-1 overflow-y-auto">
-            <div className="mx-auto w-full max-w-[1600px] p-6 md:p-8 lg:p-10">
+          <main className="min-w-0 flex-1 pt-16 lg:pt-0">
+            <div className="mx-auto w-full max-w-[1600px] px-4 py-6 sm:px-6 md:py-8 lg:px-10 lg:py-10">
               {children}
             </div>
           </main>
