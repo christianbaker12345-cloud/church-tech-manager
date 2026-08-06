@@ -10,8 +10,8 @@ const manrope = Manrope({
 });
 
 export const metadata: Metadata = {
-  title: "Church Tech Manager",
-  description: "Church equipment management system",
+  title: "Tech Steward",
+  description: "Equipment management for churches and production teams.",
 };
 
 export default function RootLayout({

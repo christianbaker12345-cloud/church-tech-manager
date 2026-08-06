@@ -125,18 +125,30 @@ export default function DashboardPage() {
     const dashboardErrors: string[] = [];
 
     if (upcomingMaintenanceResult.error) {
-      console.error(
-        "Upcoming maintenance load error:",
-        upcomingMaintenanceResult.error
-      );
-      dashboardErrors.push(upcomingMaintenanceResult.error.message);
-      setUpcomingMaintenance([]);
-    } else {
-      setUpcomingMaintenance(
-        (upcomingMaintenanceResult.data ??
-          []) as UpcomingMaintenanceRecord[]
-      );
-    }
+  console.error(
+    "Upcoming maintenance load error:",
+    upcomingMaintenanceResult.error
+  );
+
+  dashboardErrors.push(
+    upcomingMaintenanceResult.error.message
+  );
+
+  setUpcomingMaintenance([]);
+} else {
+  const normalizedMaintenance = (
+    upcomingMaintenanceResult.data ?? []
+  ).map((record) => ({
+    ...record,
+    assets: Array.isArray(record.assets)
+      ? record.assets[0] ?? null
+      : record.assets,
+  }));
+
+  setUpcomingMaintenance(
+    normalizedMaintenance as UpcomingMaintenanceRecord[]
+  );
+}
 
     if (criticalRepairsResult.error) {
       console.error(

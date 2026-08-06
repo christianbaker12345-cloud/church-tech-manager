@@ -104,7 +104,7 @@ export function AppSidebar() {
           className="group flex items-center gap-4 rounded-3xl border border-white/80 bg-white px-5 py-5 shadow-sm outline-none transition hover:-translate-y-0.5 hover:shadow-lg focus-visible:ring-4 focus-visible:ring-blue-200"
         >
           <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-600 text-base font-black tracking-tight text-white shadow-lg shadow-blue-900/20 transition group-hover:scale-[1.03]">
-            CT
+            TS
           </div>
 
           <div className="min-w-0 flex-1">
