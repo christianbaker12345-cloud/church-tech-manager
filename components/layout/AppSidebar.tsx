@@ -6,6 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import type { LucideIcon } from "lucide-react";
 import {
   ArrowLeftRight,
+  ChartNoAxesCombined,
   ChevronRight,
   ClipboardCheck,
   Download,
@@ -76,6 +77,16 @@ const sections: NavigationSection[] = [
         name: "Check In / Out",
         href: "/checkin",
         icon: ClipboardCheck,
+      },
+    ],
+  },
+  {
+    label: "Planning",
+    items: [
+      {
+        name: "Reports",
+        href: "/reports",
+        icon: ChartNoAxesCombined,
       },
     ],
   },
@@ -314,7 +325,11 @@ export function AppSidebar() {
       .maybeSingle();
 
     if (error) {
-      console.error("Unable to load user profile:", error);
+      console.error(
+        "Unable to load user profile:",
+        error
+      );
+
       setProfile(null);
       return;
     }
