@@ -64,10 +64,45 @@ export default function DashboardPage() {
   >([]);
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
+  const [currentUserName, setCurrentUserName] = useState("User");
 
   useEffect(() => {
+    loadCurrentUser();
     loadDashboard();
   }, []);
+
+  async function loadCurrentUser() {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      setCurrentUserName("User");
+      return;
+    }
+
+    const { data: profile, error } = await supabase
+      .from("profiles")
+      .select("full_name")
+      .eq("id", user.id)
+      .maybeSingle();
+
+    if (error) {
+      console.error("Dashboard profile load error:", error);
+    }
+
+    const fullName = profile?.full_name?.trim();
+
+    if (fullName) {
+      const firstName = fullName.split(" ")[0];
+      setCurrentUserName(firstName);
+      return;
+    }
+
+    const emailName = user.email?.split("@")[0];
+
+    setCurrentUserName(emailName || "User");
+  }
 
   function normalizeStatus(status: string | null) {
     return status?.trim().toLowerCase() ?? "";
@@ -115,6 +150,7 @@ export default function DashboardPage() {
         "Dashboard equipment load error:",
         equipmentResult.error
       );
+
       setErrorMessage(equipmentResult.error.message);
       setStats(emptyStats);
       setUpcomingMaintenance([]);
@@ -125,36 +161,37 @@ export default function DashboardPage() {
     const dashboardErrors: string[] = [];
 
     if (upcomingMaintenanceResult.error) {
-  console.error(
-    "Upcoming maintenance load error:",
-    upcomingMaintenanceResult.error
-  );
+      console.error(
+        "Upcoming maintenance load error:",
+        upcomingMaintenanceResult.error
+      );
 
-  dashboardErrors.push(
-    upcomingMaintenanceResult.error.message
-  );
+      dashboardErrors.push(
+        upcomingMaintenanceResult.error.message
+      );
 
-  setUpcomingMaintenance([]);
-} else {
-  const normalizedMaintenance = (
-    upcomingMaintenanceResult.data ?? []
-  ).map((record) => ({
-    ...record,
-    assets: Array.isArray(record.assets)
-      ? record.assets[0] ?? null
-      : record.assets,
-  }));
+      setUpcomingMaintenance([]);
+    } else {
+      const normalizedMaintenance = (
+        upcomingMaintenanceResult.data ?? []
+      ).map((record) => ({
+        ...record,
+        assets: Array.isArray(record.assets)
+          ? record.assets[0] ?? null
+          : record.assets,
+      }));
 
-  setUpcomingMaintenance(
-    normalizedMaintenance as UpcomingMaintenanceRecord[]
-  );
-}
+      setUpcomingMaintenance(
+        normalizedMaintenance as UpcomingMaintenanceRecord[]
+      );
+    }
 
     if (criticalRepairsResult.error) {
       console.error(
         "Critical repairs count error:",
         criticalRepairsResult.error
       );
+
       dashboardErrors.push(criticalRepairsResult.error.message);
     }
 
@@ -305,7 +342,7 @@ export default function DashboardPage() {
     <div className="space-y-10">
       <PageHeader
         eyebrow="Operations Dashboard"
-        title={`${getGreeting()}, Christian`}
+        title={`${getGreeting()}, ${currentUserName}`}
         description={formatToday()}
         actions={
           <>

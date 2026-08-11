@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import type { LucideIcon } from "lucide-react";
 import {
   ArrowLeftRight,
@@ -10,6 +10,7 @@ import {
   ClipboardCheck,
   Download,
   Gauge,
+  LogOut,
   MapPin,
   Menu,
   Package,
@@ -18,6 +19,7 @@ import {
   Wrench,
   X,
 } from "lucide-react";
+import { supabase } from "@/lib/supabase";
 
 type NavigationItem = {
   name: string;
@@ -28,6 +30,11 @@ type NavigationItem = {
 type NavigationSection = {
   label: string;
   items: NavigationItem[];
+};
+
+type Profile = {
+  full_name: string | null;
+  role: string | null;
 };
 
 const sections: NavigationSection[] = [
@@ -198,7 +205,26 @@ function BrandCard() {
   );
 }
 
-function UserCard() {
+type UserCardProps = {
+  profile: Profile | null;
+  email: string;
+  signingOut: boolean;
+  onSignOut: () => void;
+};
+
+function UserCard({
+  profile,
+  email,
+  signingOut,
+  onSignOut,
+}: UserCardProps) {
+  const displayName =
+    profile?.full_name?.trim() ||
+    email.split("@")[0] ||
+    "Tech Steward User";
+
+  const displayRole = profile?.role || "Read Only";
+
   return (
     <div className="rounded-2xl border border-white/80 bg-white p-4 shadow-sm">
       <div className="flex items-center gap-3">
@@ -208,21 +234,100 @@ function UserCard() {
 
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-bold text-slate-950">
-            Christian Baker
+            {displayName}
           </p>
 
           <p className="mt-0.5 truncate text-xs font-semibold text-slate-500">
-            Administrator
+            {displayRole}
           </p>
         </div>
       </div>
+
+      <button
+        type="button"
+        onClick={onSignOut}
+        disabled={signingOut}
+        className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 hover:text-slate-950 disabled:cursor-not-allowed disabled:opacity-60"
+      >
+        <LogOut size={16} />
+
+        {signingOut ? "Signing Out..." : "Sign Out"}
+      </button>
     </div>
   );
 }
 
 export function AppSidebar() {
   const pathname = usePathname();
+  const router = useRouter();
+
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [profile, setProfile] = useState<Profile | null>(null);
+  const [email, setEmail] = useState("");
+  const [signingOut, setSigningOut] = useState(false);
+
+  useEffect(() => {
+    loadCurrentUser();
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(() => {
+      loadCurrentUser();
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
+
+  async function loadCurrentUser() {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      setProfile(null);
+      setEmail("");
+      return;
+    }
+
+    setEmail(user.email ?? "");
+
+    const { data, error } = await supabase
+      .from("profiles")
+      .select("full_name, role")
+      .eq("id", user.id)
+      .maybeSingle();
+
+    if (error) {
+      console.error("Unable to load user profile:", error);
+      setProfile(null);
+      return;
+    }
+
+    setProfile(data);
+  }
+
+  async function handleSignOut() {
+    setSigningOut(true);
+
+    const { error } = await supabase.auth.signOut();
+
+    if (error) {
+      console.error("Sign out error:", error);
+      alert(error.message);
+      setSigningOut(false);
+      return;
+    }
+
+    setProfile(null);
+    setEmail("");
+    setMobileMenuOpen(false);
+    setSigningOut(false);
+
+    router.replace("/login");
+    router.refresh();
+  }
 
   useEffect(() => {
     setMobileMenuOpen(false);
@@ -254,7 +359,12 @@ export function AppSidebar() {
         </div>
 
         <div className="shrink-0 border-t border-slate-300 bg-slate-200 p-4">
-          <UserCard />
+          <UserCard
+            profile={profile}
+            email={email}
+            signingOut={signingOut}
+            onSignOut={handleSignOut}
+          />
         </div>
       </aside>
 
@@ -335,7 +445,12 @@ export function AppSidebar() {
         </div>
 
         <div className="shrink-0 border-t border-slate-300 p-4">
-          <UserCard />
+          <UserCard
+            profile={profile}
+            email={email}
+            signingOut={signingOut}
+            onSignOut={handleSignOut}
+          />
         </div>
       </aside>
     </>
