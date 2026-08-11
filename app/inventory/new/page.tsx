@@ -6,6 +6,8 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/lib/supabase";
 
+type UserRole = "Admin" | "Staff" | "Volunteer";
+
 type Location = {
   id: string;
   name: string;
@@ -22,6 +24,10 @@ const ADD_CATEGORY = "__add_new_category__";
 
 export default function NewEquipmentPage() {
   const router = useRouter();
+
+  const [accessChecking, setAccessChecking] = useState(true);
+  const [currentUserRole, setCurrentUserRole] =
+    useState<UserRole>("Volunteer");
 
   const [saving, setSaving] = useState(false);
   const [loadingOptions, setLoadingOptions] = useState(true);
@@ -54,8 +60,51 @@ export default function NewEquipmentPage() {
   });
 
   useEffect(() => {
-    loadOptions();
+    initializePage();
   }, []);
+
+  async function initializePage() {
+    setAccessChecking(true);
+
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser();
+
+    if (userError || !user) {
+      setCurrentUserRole("Volunteer");
+      setAccessChecking(false);
+      return;
+    }
+
+    const { data: profile, error: profileError } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", user.id)
+      .maybeSingle();
+
+    if (profileError) {
+      console.error("Unable to verify equipment-create access:", profileError);
+      setCurrentUserRole("Volunteer");
+      setAccessChecking(false);
+      return;
+    }
+
+    const role: UserRole =
+      profile?.role === "Admin"
+        ? "Admin"
+        : profile?.role === "Staff"
+          ? "Staff"
+          : "Volunteer";
+
+    setCurrentUserRole(role);
+
+    if (role === "Admin" || role === "Staff") {
+      await loadOptions();
+    }
+
+    setAccessChecking(false);
+  }
 
   async function loadOptions() {
     setLoadingOptions(true);
@@ -118,6 +167,14 @@ export default function NewEquipmentPage() {
   }
 
   async function handleCreateLocation() {
+    if (
+      currentUserRole !== "Admin" &&
+      currentUserRole !== "Staff"
+    ) {
+      alert("You do not have permission to create locations.");
+      return;
+    }
+
     const trimmedName = newLocationName.trim();
     const trimmedCampus = newLocationCampus.trim();
 
@@ -196,6 +253,14 @@ export default function NewEquipmentPage() {
   }
 
   async function handleCreateCategory() {
+    if (
+      currentUserRole !== "Admin" &&
+      currentUserRole !== "Staff"
+    ) {
+      alert("You do not have permission to create categories.");
+      return;
+    }
+
     const trimmedName = newCategoryName.trim();
 
     if (!trimmedName) {
@@ -326,6 +391,14 @@ export default function NewEquipmentPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
 
+    if (
+      currentUserRole !== "Admin" &&
+      currentUserRole !== "Staff"
+    ) {
+      alert("You do not have permission to add equipment.");
+      return;
+    }
+
     if (!form.category) {
       alert("Please select a category.");
       return;
@@ -396,6 +469,64 @@ export default function NewEquipmentPage() {
 
     router.push("/inventory");
     router.refresh();
+  }
+
+  if (accessChecking) {
+    return (
+      <div className="max-w-4xl p-8">
+        <div className="rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
+          <p className="text-sm font-semibold uppercase tracking-[0.16em] text-slate-500">
+            Checking Access
+          </p>
+
+          <h1 className="mt-3 text-3xl font-bold text-slate-950">
+            Verifying permissions...
+          </h1>
+
+          <p className="mt-3 text-slate-500">
+            Tech Steward is confirming that your account can add equipment.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (
+    currentUserRole !== "Admin" &&
+    currentUserRole !== "Staff"
+  ) {
+    return (
+      <div className="max-w-4xl p-8">
+        <Link
+          href="/inventory"
+          className="text-blue-600 hover:underline"
+        >
+          ← Back to Inventory
+        </Link>
+
+        <div className="mt-6 rounded-2xl border border-amber-200 bg-amber-50 p-8 shadow-sm">
+          <p className="text-sm font-semibold uppercase tracking-[0.16em] text-amber-700">
+            Volunteer Access
+          </p>
+
+          <h1 className="mt-3 text-3xl font-bold text-slate-950">
+            This page is read-only for your account.
+          </h1>
+
+          <p className="mt-3 max-w-2xl leading-7 text-slate-600">
+            Volunteers can view inventory, locations, the capital replacement
+            forecast, and export inventory data. Adding or changing equipment
+            requires a Staff or Admin account.
+          </p>
+
+          <div className="mt-6">
+            <Link href="/inventory">
+              <Button>Return to Inventory</Button>
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (

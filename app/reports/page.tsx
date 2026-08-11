@@ -125,9 +125,64 @@ export default function ReportsPage() {
 
   const [search, setSearch] = useState("");
 
-  useEffect(() => {
-    loadForecast();
-  }, []);
+useEffect(() => {
+  let mounted = true;
+
+  async function initializeForecast() {
+    const {
+      data: { session },
+      error,
+    } = await supabase.auth.getSession();
+
+    if (!mounted) return;
+
+    if (error) {
+      console.error(
+        "Unable to restore auth session:",
+        error
+      );
+
+      setErrorMessage(
+        `Unable to restore your login session: ${error.message}`
+      );
+
+      setLoading(false);
+      return;
+    }
+
+    if (!session) {
+      setErrorMessage(
+        "Your login session could not be found. Please sign out and sign back in."
+      );
+
+      setLoading(false);
+      return;
+    }
+
+    await loadForecast();
+  }
+
+  initializeForecast();
+
+  const {
+    data: { subscription },
+  } = supabase.auth.onAuthStateChange(
+    (event, session) => {
+      if (
+        session &&
+        (event === "SIGNED_IN" ||
+          event === "TOKEN_REFRESHED")
+      ) {
+        loadForecast();
+      }
+    }
+  );
+
+  return () => {
+    mounted = false;
+    subscription.unsubscribe();
+  };
+}, []);
 
   async function loadForecast() {
     setLoading(true);
@@ -151,17 +206,32 @@ export default function ReportsPage() {
         ascending: true,
       });
 
-    if (error) {
-      console.error(
-        "Capital replacement forecast error:",
-        error
-      );
+if (error) {
+  const errorDetails = {
+    message: error.message,
+    code: error.code,
+    details: error.details,
+    hint: error.hint,
+  };
 
-      setErrorMessage(error.message);
-      setRecords([]);
-      setLoading(false);
-      return;
-    }
+  console.error(
+    "Capital replacement forecast error:",
+    JSON.stringify(errorDetails, null, 2)
+  );
+
+  setErrorMessage(
+    [
+      `Message: ${error.message || "Unknown error"}`,
+      `Code: ${error.code || "None"}`,
+      `Details: ${error.details || "None"}`,
+      `Hint: ${error.hint || "None"}`,
+    ].join(" | ")
+  );
+
+  setRecords([]);
+  setLoading(false);
+  return;
+}
 
     setRecords(
       (data ?? []) as EquipmentLifecycleRecord[]

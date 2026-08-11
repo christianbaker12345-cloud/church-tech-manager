@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import type { LucideIcon } from "lucide-react";
 import {
@@ -23,10 +23,13 @@ import {
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 
+type UserRole = "Admin" | "Staff" | "Volunteer";
+
 type NavigationItem = {
   name: string;
   href: string;
   icon: LucideIcon;
+  roles: UserRole[];
 };
 
 type NavigationSection = {
@@ -39,6 +42,17 @@ type Profile = {
   role: string | null;
 };
 
+const fullAccess: UserRole[] = [
+  "Admin",
+  "Staff",
+];
+
+const allRoles: UserRole[] = [
+  "Admin",
+  "Staff",
+  "Volunteer",
+];
+
 const sections: NavigationSection[] = [
   {
     label: "Overview",
@@ -47,6 +61,7 @@ const sections: NavigationSection[] = [
         name: "Dashboard",
         href: "/",
         icon: Gauge,
+        roles: allRoles,
       },
     ],
   },
@@ -57,26 +72,31 @@ const sections: NavigationSection[] = [
         name: "Inventory",
         href: "/inventory",
         icon: Package,
+        roles: allRoles,
       },
       {
         name: "Locations",
         href: "/locations",
         icon: MapPin,
+        roles: allRoles,
       },
       {
         name: "Transfers",
         href: "/transfers",
         icon: ArrowLeftRight,
+        roles: fullAccess,
       },
       {
         name: "Maintenance",
         href: "/maintenance",
         icon: Wrench,
+        roles: fullAccess,
       },
       {
         name: "Check In / Out",
         href: "/checkin",
         icon: ClipboardCheck,
+        roles: fullAccess,
       },
     ],
   },
@@ -87,6 +107,7 @@ const sections: NavigationSection[] = [
         name: "Reports",
         href: "/reports",
         icon: ChartNoAxesCombined,
+        roles: allRoles,
       },
     ],
   },
@@ -97,11 +118,13 @@ const sections: NavigationSection[] = [
         name: "Import Center",
         href: "/tools/import",
         icon: Upload,
+        roles: fullAccess,
       },
       {
         name: "Export Center",
         href: "/tools/export",
         icon: Download,
+        roles: allRoles,
       },
     ],
   },
@@ -109,11 +132,13 @@ const sections: NavigationSection[] = [
 
 type SidebarNavigationProps = {
   pathname: string;
+  role: UserRole;
   onNavigate?: () => void;
 };
 
 function SidebarNavigation({
   pathname,
+  role,
   onNavigate,
 }: SidebarNavigationProps) {
   function isActive(href: string) {
@@ -121,8 +146,24 @@ function SidebarNavigation({
       return pathname === "/";
     }
 
-    return pathname === href || pathname.startsWith(`${href}/`);
+    return (
+      pathname === href ||
+      pathname.startsWith(`${href}/`)
+    );
   }
+
+  const visibleSections = useMemo(() => {
+    return sections
+      .map((section) => ({
+        ...section,
+        items: section.items.filter((item) =>
+          item.roles.includes(role)
+        ),
+      }))
+      .filter(
+        (section) => section.items.length > 0
+      );
+  }, [role]);
 
   return (
     <nav
@@ -130,7 +171,7 @@ function SidebarNavigation({
       className="h-full overflow-y-auto overscroll-contain rounded-3xl border border-slate-300 bg-slate-100 p-4 shadow-inner [scrollbar-color:#94a3b8_transparent] [scrollbar-width:thin] [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-400 [&::-webkit-scrollbar-track]:bg-transparent"
     >
       <div className="space-y-8 pb-4">
-        {sections.map((section) => (
+        {visibleSections.map((section) => (
           <section key={section.label}>
             <p className="mb-3 px-2 text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500">
               {section.label}
@@ -146,7 +187,9 @@ function SidebarNavigation({
                     key={item.href}
                     href={item.href}
                     onClick={onNavigate}
-                    aria-current={active ? "page" : undefined}
+                    aria-current={
+                      active ? "page" : undefined
+                    }
                     className={`group relative flex min-h-12 items-center gap-3 overflow-hidden rounded-xl px-3 py-3 text-sm font-semibold outline-none transition focus-visible:ring-4 focus-visible:ring-blue-200 ${
                       active
                         ? "bg-white text-blue-700 shadow-md shadow-slate-900/10"
@@ -164,7 +207,10 @@ function SidebarNavigation({
                           : "bg-white text-slate-500 shadow-sm group-hover:text-slate-800"
                       }`}
                     >
-                      <Icon size={18} strokeWidth={2.1} />
+                      <Icon
+                        size={18}
+                        strokeWidth={2.1}
+                      />
                     </span>
 
                     <span className="min-w-0 flex-1 truncate">
@@ -237,13 +283,17 @@ function UserCard({
     email.split("@")[0] ||
     "Tech Steward User";
 
-  const displayRole = profile?.role || "Read Only";
+  const displayRole =
+    profile?.role || "Volunteer";
 
   return (
     <div className="rounded-2xl border border-white/80 bg-white p-4 shadow-sm">
       <div className="flex items-center gap-3">
         <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-slate-900 text-white">
-          <UserRound size={18} strokeWidth={2.1} />
+          <UserRound
+            size={18}
+            strokeWidth={2.1}
+          />
         </div>
 
         <div className="min-w-0 flex-1">
@@ -275,21 +325,43 @@ function UserCard({
         >
           <LogOut size={16} />
 
-          {signingOut ? "Signing Out..." : "Sign Out"}
+          {signingOut
+            ? "Signing Out..."
+            : "Sign Out"}
         </button>
       </div>
     </div>
   );
 }
 
+function normalizeRole(
+  role: string | null | undefined
+): UserRole {
+  if (role === "Admin") {
+    return "Admin";
+  }
+
+  if (role === "Staff") {
+    return "Staff";
+  }
+
+  return "Volunteer";
+}
+
 export function AppSidebar() {
   const pathname = usePathname();
   const router = useRouter();
 
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [profile, setProfile] = useState<Profile | null>(null);
+  const [mobileMenuOpen, setMobileMenuOpen] =
+    useState(false);
+
+  const [profile, setProfile] =
+    useState<Profile | null>(null);
+
   const [email, setEmail] = useState("");
-  const [signingOut, setSigningOut] = useState(false);
+
+  const [signingOut, setSigningOut] =
+    useState(false);
 
   useEffect(() => {
     loadCurrentUser();
@@ -340,10 +412,15 @@ export function AppSidebar() {
   async function handleSignOut() {
     setSigningOut(true);
 
-    const { error } = await supabase.auth.signOut();
+    const { error } =
+      await supabase.auth.signOut();
 
     if (error) {
-      console.error("Sign out error:", error);
+      console.error(
+        "Sign out error:",
+        error
+      );
+
       alert(error.message);
       setSigningOut(false);
       return;
@@ -375,16 +452,22 @@ export function AppSidebar() {
     };
   }, [mobileMenuOpen]);
 
+  const role = normalizeRole(profile?.role);
+
   return (
     <>
       {/* Desktop sidebar */}
+
       <aside className="sticky top-0 hidden h-screen w-80 shrink-0 flex-col overflow-hidden border-r border-slate-300 bg-slate-200 shadow-[8px_0_24px_rgba(15,23,42,0.08)] lg:flex">
         <div className="shrink-0 p-5">
           <BrandCard />
         </div>
 
         <div className="min-h-0 flex-1 px-4 pb-4">
-          <SidebarNavigation pathname={pathname} />
+          <SidebarNavigation
+            pathname={pathname}
+            role={role}
+          />
         </div>
 
         <div className="shrink-0 border-t border-slate-300 bg-slate-200 p-4">
@@ -398,6 +481,7 @@ export function AppSidebar() {
       </aside>
 
       {/* Mobile top bar */}
+
       <header className="fixed inset-x-0 top-0 z-40 flex h-16 items-center justify-between border-b border-slate-200 bg-white/95 px-4 shadow-sm backdrop-blur lg:hidden">
         <Link
           href="/"
@@ -420,19 +504,27 @@ export function AppSidebar() {
 
         <button
           type="button"
-          onClick={() => setMobileMenuOpen(true)}
+          onClick={() =>
+            setMobileMenuOpen(true)
+          }
           aria-label="Open navigation menu"
           aria-expanded={mobileMenuOpen}
           className="flex h-11 w-11 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-slate-700 outline-none transition hover:bg-slate-100 focus-visible:ring-4 focus-visible:ring-blue-200"
         >
-          <Menu size={22} strokeWidth={2.1} />
+          <Menu
+            size={22}
+            strokeWidth={2.1}
+          />
         </button>
       </header>
 
       {/* Mobile overlay */}
+
       <div
         aria-hidden={!mobileMenuOpen}
-        onClick={() => setMobileMenuOpen(false)}
+        onClick={() =>
+          setMobileMenuOpen(false)
+        }
         className={`fixed inset-0 z-50 bg-slate-950/50 backdrop-blur-sm transition-opacity duration-200 lg:hidden ${
           mobileMenuOpen
             ? "pointer-events-auto opacity-100"
@@ -441,6 +533,7 @@ export function AppSidebar() {
       />
 
       {/* Mobile drawer */}
+
       <aside
         role="dialog"
         aria-modal="true"
@@ -458,18 +551,26 @@ export function AppSidebar() {
 
           <button
             type="button"
-            onClick={() => setMobileMenuOpen(false)}
+            onClick={() =>
+              setMobileMenuOpen(false)
+            }
             aria-label="Close navigation menu"
             className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-slate-300 bg-white text-slate-600 outline-none transition hover:bg-slate-100 hover:text-slate-950 focus-visible:ring-4 focus-visible:ring-blue-200"
           >
-            <X size={21} strokeWidth={2.1} />
+            <X
+              size={21}
+              strokeWidth={2.1}
+            />
           </button>
         </div>
 
         <div className="min-h-0 flex-1 px-4 pb-4">
           <SidebarNavigation
             pathname={pathname}
-            onNavigate={() => setMobileMenuOpen(false)}
+            role={role}
+            onNavigate={() =>
+              setMobileMenuOpen(false)
+            }
           />
         </div>
 
@@ -479,7 +580,9 @@ export function AppSidebar() {
             email={email}
             signingOut={signingOut}
             onSignOut={handleSignOut}
-            onCloseMenu={() => setMobileMenuOpen(false)}
+            onCloseMenu={() =>
+              setMobileMenuOpen(false)
+            }
           />
         </div>
       </aside>
