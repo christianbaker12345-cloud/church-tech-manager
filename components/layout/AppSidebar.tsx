@@ -10,6 +10,7 @@ import {
   ClipboardCheck,
   Download,
   Gauge,
+  KeyRound,
   LogOut,
   MapPin,
   Menu,
@@ -210,6 +211,7 @@ type UserCardProps = {
   email: string;
   signingOut: boolean;
   onSignOut: () => void;
+  onCloseMenu?: () => void;
 };
 
 function UserCard({
@@ -217,6 +219,7 @@ function UserCard({
   email,
   signingOut,
   onSignOut,
+  onCloseMenu,
 }: UserCardProps) {
   const displayName =
     profile?.full_name?.trim() ||
@@ -243,16 +246,27 @@ function UserCard({
         </div>
       </div>
 
-      <button
-        type="button"
-        onClick={onSignOut}
-        disabled={signingOut}
-        className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 hover:text-slate-950 disabled:cursor-not-allowed disabled:opacity-60"
-      >
-        <LogOut size={16} />
+      <div className="mt-4 space-y-2">
+        <Link
+          href="/set-password"
+          onClick={onCloseMenu}
+          className="flex w-full items-center justify-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-3 py-2.5 text-sm font-semibold text-blue-700 transition hover:bg-blue-100 hover:text-blue-800 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-blue-200"
+        >
+          <KeyRound size={16} />
+          Set / Change Password
+        </Link>
 
-        {signingOut ? "Signing Out..." : "Sign Out"}
-      </button>
+        <button
+          type="button"
+          onClick={onSignOut}
+          disabled={signingOut}
+          className="flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 hover:text-slate-950 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          <LogOut size={16} />
+
+          {signingOut ? "Signing Out..." : "Sign Out"}
+        </button>
+      </div>
     </div>
   );
 }
@@ -450,6 +464,7 @@ export function AppSidebar() {
             email={email}
             signingOut={signingOut}
             onSignOut={handleSignOut}
+            onCloseMenu={() => setMobileMenuOpen(false)}
           />
         </div>
       </aside>
