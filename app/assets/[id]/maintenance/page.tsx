@@ -17,6 +17,8 @@ import { Button } from "@/components/ui/button";
 import { supabase } from "@/lib/supabase";
 import { useParams } from "next/navigation";
 
+type UserRole = "Admin" | "Staff" | "Volunteer";
+
 type EquipmentItem = {
   id: string;
   asset_tag: string | null;
@@ -54,15 +56,67 @@ export default function EquipmentMaintenancePage() {
   const [nextServiceDate, setNextServiceDate] = useState("");
   const [resolutionNotes, setResolutionNotes] = useState("");
 
+  const [accessChecking, setAccessChecking] = useState(true);
+  const [currentUserRole, setCurrentUserRole] =
+    useState<UserRole>("Volunteer");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
 
   useEffect(() => {
     if (equipmentItemId) {
-      loadPage();
+      initializePage();
     }
   }, [equipmentItemId]);
+
+  async function initializePage() {
+    setAccessChecking(true);
+
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser();
+
+    if (userError || !user) {
+      setCurrentUserRole("Volunteer");
+      await loadPage();
+      setAccessChecking(false);
+      return;
+    }
+
+    const { data: profile, error: profileError } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", user.id)
+      .maybeSingle();
+
+    if (profileError) {
+      console.error(
+        "Unable to verify maintenance access:",
+        profileError
+      );
+      setCurrentUserRole("Volunteer");
+    } else {
+      const role: UserRole =
+        profile?.role === "Admin"
+          ? "Admin"
+          : profile?.role === "Staff"
+            ? "Staff"
+            : "Volunteer";
+
+      setCurrentUserRole(role);
+    }
+
+    await loadPage();
+    setAccessChecking(false);
+  }
+
+  function canManageMaintenance() {
+    return (
+      currentUserRole === "Admin" ||
+      currentUserRole === "Staff"
+    );
+  }
 
   async function loadPage() {
     if (!equipmentItemId) return;
@@ -118,6 +172,12 @@ export default function EquipmentMaintenancePage() {
   }
 
   async function syncEquipmentStatus() {
+    if (!canManageMaintenance()) {
+      throw new Error(
+        "You do not have permission to change maintenance status."
+      );
+    }
+
     if (!equipmentItemId) return;
 
     const { data, error } = await supabase
@@ -169,11 +229,25 @@ export default function EquipmentMaintenancePage() {
   }
 
   function openNewRecordForm() {
+    if (!canManageMaintenance()) {
+      alert(
+        "You do not have permission to add maintenance records."
+      );
+      return;
+    }
+
     resetForm();
     setShowForm(true);
   }
 
   function editRecord(record: MaintenanceRecord) {
+    if (!canManageMaintenance()) {
+      alert(
+        "You do not have permission to edit maintenance records."
+      );
+      return;
+    }
+
     setEditingRecord(record);
     setIssueTitle(record.issue_title);
     setDescription(record.description ?? "");
@@ -201,6 +275,13 @@ export default function EquipmentMaintenancePage() {
     event: FormEvent<HTMLFormElement>
   ) {
     event.preventDefault();
+
+    if (!canManageMaintenance()) {
+      alert(
+        "You do not have permission to save maintenance records."
+      );
+      return;
+    }
 
     if (!equipmentItemId) return;
 
@@ -279,6 +360,13 @@ export default function EquipmentMaintenancePage() {
   }
 
   async function deleteRecord(record: MaintenanceRecord) {
+    if (!canManageMaintenance()) {
+      alert(
+        "You do not have permission to delete maintenance records."
+      );
+      return;
+    }
+
     const confirmed = window.confirm(
       `Delete the maintenance record "${record.issue_title}"?`
     );
@@ -310,7 +398,7 @@ export default function EquipmentMaintenancePage() {
     await loadPage();
   }
 
-  if (loading) {
+  if (accessChecking || loading) {
     return (
       <div className="p-8">
         <h1 className="text-3xl font-bold">
@@ -348,6 +436,8 @@ export default function EquipmentMaintenancePage() {
     equipmentItem.asset_tag ||
     "Unnamed Equipment";
 
+  const canManage = canManageMaintenance();
+
   return (
     <div className="p-8">
       <Link
@@ -373,9 +463,11 @@ export default function EquipmentMaintenancePage() {
           </p>
         </div>
 
-        <Button onClick={openNewRecordForm}>
-          Add Maintenance Record
-        </Button>
+        {canManage && (
+          <Button onClick={openNewRecordForm}>
+            Add Maintenance Record
+          </Button>
+        )}
       </div>
 
       {errorMessage && (
@@ -384,7 +476,7 @@ export default function EquipmentMaintenancePage() {
         </div>
       )}
 
-      {showForm && (
+      {canManage && showForm && (
         <MaintenanceForm
           isEditing={editingRecord !== null}
           saving={saving}
@@ -426,9 +518,13 @@ export default function EquipmentMaintenancePage() {
           <MaintenanceList
             records={records}
             emptyTitle="No maintenance records"
-            emptyMessage="Create the first record when this equipment needs service."
-            onEdit={editRecord}
-            onDelete={deleteRecord}
+            emptyMessage={
+              canManage
+                ? "Create the first record when this equipment needs service."
+                : "No maintenance records have been added for this equipment."
+            }
+            onEdit={canManage ? editRecord : undefined}
+            onDelete={canManage ? deleteRecord : undefined}
           />
         </div>
       </div>

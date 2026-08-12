@@ -30,6 +30,12 @@ type Equipment = {
   trash_reason: string | null;
 };
 
+type Asset = {
+  id: string;
+  equipment_id: string | null;
+  status: string | null;
+};
+
 type UserRole = "Admin" | "Staff" | "Volunteer";
 
 type LifecycleFilter =
@@ -86,6 +92,8 @@ export default function InventoryPage() {
   const [equipment, setEquipment] = useState<
     Equipment[]
   >([]);
+
+  const [assets, setAssets] = useState<Asset[]>([]);
 
   const [loading, setLoading] = useState(true);
 
@@ -233,15 +241,115 @@ export default function InventoryPage() {
       return;
     }
 
-    setEquipment(
-      (data ?? []) as Equipment[]
+    const loadedEquipment =
+      (data ?? []) as Equipment[];
+
+    setEquipment(loadedEquipment);
+
+    const equipmentIds = loadedEquipment.map(
+      (item) => item.id
     );
+
+    if (equipmentIds.length === 0) {
+      setAssets([]);
+      setLoading(false);
+      return;
+    }
+
+    const { data: assetData, error: assetError } =
+      await supabase
+        .from("assets")
+        .select("id,equipment_id,status")
+        .in("equipment_id", equipmentIds);
+
+    if (assetError) {
+      console.error(
+        "Asset status load error:",
+        assetError
+      );
+
+      setErrorMessage(
+        `Equipment loaded, but individual asset statuses could not be loaded: ${assetError.message}`
+      );
+      setAssets([]);
+    } else {
+      setAssets((assetData ?? []) as Asset[]);
+    }
 
     setLoading(false);
   }
 
   const canManageEquipment =
     role === "Admin" || role === "Staff";
+
+  const effectiveStatusByEquipmentId = useMemo(() => {
+    const statusesByEquipment = new Map<
+      string,
+      string[]
+    >();
+
+    for (const asset of assets) {
+      if (!asset.equipment_id) continue;
+
+      const statuses =
+        statusesByEquipment.get(
+          asset.equipment_id
+        ) ?? [];
+
+      statuses.push(normalizeStatus(asset.status));
+
+      statusesByEquipment.set(
+        asset.equipment_id,
+        statuses
+      );
+    }
+
+    const effectiveStatuses = new Map<
+      string,
+      string | null
+    >();
+
+    for (const item of equipment) {
+      const assetStatuses =
+        statusesByEquipment.get(item.id) ?? [];
+
+      const hasMaintenanceAsset =
+        assetStatuses.some(
+          (status) =>
+            status === "maintenance" ||
+            status === "in repair"
+        );
+
+      const hasCheckedOutAsset =
+        assetStatuses.some(
+          (status) => status === "checked out"
+        );
+
+      const effectiveStatus =
+        hasMaintenanceAsset
+          ? "Maintenance"
+          : hasCheckedOutAsset
+            ? "Checked Out"
+            : item.status;
+
+      effectiveStatuses.set(
+        item.id,
+        effectiveStatus
+      );
+    }
+
+    return effectiveStatuses;
+  }, [equipment, assets]);
+
+  function getEffectiveStatus(
+    item: Equipment
+  ) {
+    return (
+      effectiveStatusByEquipmentId.get(
+        item.id
+      ) ?? item.status
+    );
+  }
 
   const categories = useMemo(() => {
     const values = equipment
@@ -258,7 +366,7 @@ export default function InventoryPage() {
 
   const statuses = useMemo(() => {
     const values = equipment
-      .map((item) => item.status)
+      .map((item) => getEffectiveStatus(item))
       .filter(
         (status): status is string =>
           Boolean(status && status.trim())
@@ -267,7 +375,7 @@ export default function InventoryPage() {
     return Array.from(
       new Set(values)
     ).sort();
-  }, [equipment]);
+  }, [equipment, effectiveStatusByEquipmentId]);
 
   const filteredEquipment = useMemo(() => {
     const normalizedSearch = search
@@ -275,6 +383,9 @@ export default function InventoryPage() {
       .toLowerCase();
 
     return equipment.filter((item) => {
+      const effectiveStatus =
+        getEffectiveStatus(item);
+
       const matchesSearch =
         normalizedSearch.length === 0 ||
         item.name
@@ -286,7 +397,7 @@ export default function InventoryPage() {
         item.location
           ?.toLowerCase()
           .includes(normalizedSearch) ||
-        item.status
+        effectiveStatus
           ?.toLowerCase()
           .includes(normalizedSearch) ||
         item.notes
@@ -299,7 +410,7 @@ export default function InventoryPage() {
 
       const matchesStatus =
         statusFilter === "All" ||
-        item.status === statusFilter;
+        effectiveStatus === statusFilter;
 
       return (
         matchesSearch &&
@@ -312,6 +423,7 @@ export default function InventoryPage() {
     search,
     categoryFilter,
     statusFilter,
+    effectiveStatusByEquipmentId,
   ]);
 
   const summary = useMemo(() => {
@@ -327,14 +439,16 @@ export default function InventoryPage() {
 
       available: equipment.filter(
         (item) =>
-          normalizeStatus(item.status) ===
-          "available"
+          normalizeStatus(
+            getEffectiveStatus(item)
+          ) === "available"
       ).length,
 
       attention: equipment.filter(
         (item) => {
-          const status =
-            normalizeStatus(item.status);
+          const status = normalizeStatus(
+            getEffectiveStatus(item)
+          );
 
           return (
             status === "maintenance" ||
@@ -344,7 +458,7 @@ export default function InventoryPage() {
         }
       ).length,
     };
-  }, [equipment]);
+  }, [equipment, effectiveStatusByEquipmentId]);
 
   function clearFilters() {
     setSearch("");
@@ -911,10 +1025,10 @@ export default function InventoryPage() {
                       <td className="px-6 py-5">
                         <span
                           className={`inline-flex rounded-full px-3 py-1 text-sm font-semibold ${statusClasses(
-                            item.status
+                            getEffectiveStatus(item)
                           )}`}
                         >
-                          {item.status ||
+                          {getEffectiveStatus(item) ||
                             "Unknown"}
                         </span>
                       </td>
@@ -925,13 +1039,13 @@ export default function InventoryPage() {
                       </td>
 
                       <td className="px-6 py-5 text-right">
-                        <Link
+                        <a
                           href={`/inventory/${item.id}`}
                           className="inline-flex items-center gap-2 whitespace-nowrap rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700"
                         >
                           <Eye className="h-4 w-4" />
                           View
-                        </Link>
+                        </a>
                       </td>
                     </tr>
                   )

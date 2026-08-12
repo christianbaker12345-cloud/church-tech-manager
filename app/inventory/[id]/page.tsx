@@ -108,6 +108,29 @@ export default function EquipmentDetailsPage() {
   const canManage =
     currentUserRole === "Admin" || currentUserRole === "Staff";
 
+  const assetStatuses = assets.map((asset) =>
+    normalizeStatus(asset.status)
+  );
+
+  const hasMaintenanceAsset = assetStatuses.some(
+    (status) =>
+      status === "maintenance" ||
+      status === "in repair"
+  );
+
+  const hasCheckedOutAsset = assetStatuses.some(
+    (status) => status === "checked out"
+  );
+
+  const effectiveEquipmentStatus =
+    item?.retired_at || item?.trashed_at
+      ? item?.status
+      : hasMaintenanceAsset
+        ? "Maintenance"
+        : hasCheckedOutAsset
+          ? "Checked Out"
+          : item?.status;
+
   async function initializePage() {
     setAccessChecking(true);
 
@@ -914,10 +937,10 @@ export default function EquipmentDetailsPage() {
 
             <span
               className={`rounded-full px-4 py-2 font-semibold ${statusClasses(
-                item.status
+                effectiveEquipmentStatus
               )}`}
             >
-              {item.status || "Unknown"}
+              {effectiveEquipmentStatus || "Unknown"}
             </span>
           </div>
 
@@ -1090,17 +1113,6 @@ export default function EquipmentDetailsPage() {
                   </p>
                 </div>
               </div>
-            </div>
-          )}
-
-          {!canManage && (
-            <div className="mt-8 rounded-xl border border-amber-200 bg-amber-50 p-5">
-              <p className="text-sm font-bold uppercase tracking-[0.16em] text-amber-700">
-                Volunteer Access
-              </p>
-              <p className="mt-2 text-slate-700">
-                This equipment record is read-only for your account.
-              </p>
             </div>
           )}
 
