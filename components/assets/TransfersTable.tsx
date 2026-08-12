@@ -34,6 +34,7 @@ type TransfersTableProps = {
   transfers: TransferRecord[];
   returningTransferId: string | null;
   onReturn: (transfer: TransferRecord) => void;
+  canManage: boolean;
 };
 
 function getEquipment(transfer: TransferRecord) {
@@ -94,6 +95,7 @@ export default function TransfersTable({
   transfers,
   returningTransferId,
   onReturn,
+  canManage,
 }: TransfersTableProps) {
   if (transfers.length === 0) {
     return (
@@ -103,7 +105,7 @@ export default function TransfersTable({
         </h3>
 
         <p className="mt-2 text-gray-500">
-          Transfer an equipment item or adjust your filters.
+          No transfer records match the current filters.
         </p>
       </div>
     );
@@ -121,7 +123,9 @@ export default function TransfersTable({
             <th className="p-4 text-left">Transferred</th>
             <th className="p-4 text-left">Due</th>
             <th className="p-4 text-left">Status</th>
-            <th className="p-4 text-left">Action</th>
+            {canManage && (
+              <th className="p-4 text-left">Action</th>
+            )}
           </tr>
         </thead>
 
@@ -196,25 +200,27 @@ export default function TransfersTable({
                   )}
                 </td>
 
-                <td className="p-4">
-                  {!transfer.returned_date ? (
-                    <Button
-                      variant="outline"
-                      onClick={() => onReturn(transfer)}
-                      disabled={
-                        returningTransferId === transfer.id
-                      }
-                    >
-                      {returningTransferId === transfer.id
-                        ? "Returning..."
-                        : "Return Equipment"}
-                    </Button>
-                  ) : (
-                    <span className="text-sm text-gray-500">
-                      Complete
-                    </span>
-                  )}
-                </td>
+                {canManage && (
+                  <td className="p-4">
+                    {!transfer.returned_date ? (
+                      <Button
+                        variant="outline"
+                        onClick={() => onReturn(transfer)}
+                        disabled={
+                          returningTransferId === transfer.id
+                        }
+                      >
+                        {returningTransferId === transfer.id
+                          ? "Returning..."
+                          : "Return Equipment"}
+                      </Button>
+                    ) : (
+                      <span className="text-sm text-gray-500">
+                        Complete
+                      </span>
+                    )}
+                  </td>
+                )}
               </tr>
             );
           })}

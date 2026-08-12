@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import type { LucideIcon } from "lucide-react";
 import {
   ArrowLeftRight,
@@ -21,9 +21,13 @@ import {
   Wrench,
   X,
 } from "lucide-react";
+
 import { supabase } from "@/lib/supabase";
 
-type UserRole = "Admin" | "Staff" | "Volunteer";
+type UserRole =
+  | "Admin"
+  | "Staff"
+  | "Volunteer";
 
 type NavigationItem = {
   name: string;
@@ -96,7 +100,7 @@ const sections: NavigationSection[] = [
         name: "Check In / Out",
         href: "/checkin",
         icon: ClipboardCheck,
-        roles: fullAccess,
+        roles: allRoles,
       },
     ],
   },
@@ -156,12 +160,14 @@ function SidebarNavigation({
     return sections
       .map((section) => ({
         ...section,
-        items: section.items.filter((item) =>
-          item.roles.includes(role)
+        items: section.items.filter(
+          (item) =>
+            item.roles.includes(role)
         ),
       }))
       .filter(
-        (section) => section.items.length > 0
+        (section) =>
+          section.items.length > 0
       );
   }, [role]);
 
@@ -171,66 +177,87 @@ function SidebarNavigation({
       className="h-full overflow-y-auto overscroll-contain rounded-3xl border border-slate-300 bg-slate-100 p-4 shadow-inner [scrollbar-color:#94a3b8_transparent] [scrollbar-width:thin] [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-400 [&::-webkit-scrollbar-track]:bg-transparent"
     >
       <div className="space-y-8 pb-4">
-        {visibleSections.map((section) => (
-          <section key={section.label}>
-            <p className="mb-3 px-2 text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500">
-              {section.label}
-            </p>
+        {visibleSections.map(
+          (section) => (
+            <section key={section.label}>
+              <p className="mb-3 px-2 text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500">
+                {section.label}
+              </p>
 
-            <div className="space-y-1">
-              {section.items.map((item) => {
-                const Icon = item.icon;
-                const active = isActive(item.href);
+              <div className="space-y-1">
+                {section.items.map(
+                  (item) => {
+                    const Icon =
+                      item.icon;
 
-                return (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    onClick={onNavigate}
-                    aria-current={
-                      active ? "page" : undefined
-                    }
-                    className={`group relative flex min-h-12 items-center gap-3 overflow-hidden rounded-xl px-3 py-3 text-sm font-semibold outline-none transition focus-visible:ring-4 focus-visible:ring-blue-200 ${
-                      active
-                        ? "bg-white text-blue-700 shadow-md shadow-slate-900/10"
-                        : "text-slate-700 hover:bg-white hover:text-slate-950 hover:shadow-sm"
-                    }`}
-                  >
-                    {active && (
-                      <span className="absolute inset-y-2 left-0 w-1 rounded-r-full bg-blue-600" />
-                    )}
+                    const active =
+                      isActive(
+                        item.href
+                      );
 
-                    <span
-                      className={`ml-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition ${
-                        active
-                          ? "bg-blue-100 text-blue-700"
-                          : "bg-white text-slate-500 shadow-sm group-hover:text-slate-800"
-                      }`}
-                    >
-                      <Icon
-                        size={18}
-                        strokeWidth={2.1}
-                      />
-                    </span>
+                    return (
+                      <Link
+                        key={
+                          item.href
+                        }
+                        href={
+                          item.href
+                        }
+                        onClick={
+                          onNavigate
+                        }
+                        aria-current={
+                          active
+                            ? "page"
+                            : undefined
+                        }
+                        className={`group relative flex min-h-12 items-center gap-3 overflow-hidden rounded-xl px-3 py-3 text-sm font-semibold outline-none transition focus-visible:ring-4 focus-visible:ring-blue-200 ${
+                          active
+                            ? "bg-white text-blue-700 shadow-md shadow-slate-900/10"
+                            : "text-slate-700 hover:bg-white hover:text-slate-950 hover:shadow-sm"
+                        }`}
+                      >
+                        {active && (
+                          <span className="absolute inset-y-2 left-0 w-1 rounded-r-full bg-blue-600" />
+                        )}
 
-                    <span className="min-w-0 flex-1 truncate">
-                      {item.name}
-                    </span>
+                        <span
+                          className={`ml-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition ${
+                            active
+                              ? "bg-blue-100 text-blue-700"
+                              : "bg-white text-slate-500 shadow-sm group-hover:text-slate-800"
+                          }`}
+                        >
+                          <Icon
+                            size={18}
+                            strokeWidth={
+                              2.1
+                            }
+                          />
+                        </span>
 
-                    <ChevronRight
-                      size={16}
-                      className={`shrink-0 transition ${
-                        active
-                          ? "translate-x-0 text-blue-500 opacity-100"
-                          : "-translate-x-1 text-slate-400 opacity-0 group-hover:translate-x-0 group-hover:opacity-100"
-                      }`}
-                    />
-                  </Link>
-                );
-              })}
-            </div>
-          </section>
-        ))}
+                        <span className="min-w-0 flex-1 truncate">
+                          {
+                            item.name
+                          }
+                        </span>
+
+                        <ChevronRight
+                          size={16}
+                          className={`shrink-0 transition ${
+                            active
+                              ? "translate-x-0 text-blue-500 opacity-100"
+                              : "-translate-x-1 text-slate-400 opacity-0 group-hover:translate-x-0 group-hover:opacity-100"
+                          }`}
+                        />
+                      </Link>
+                    );
+                  }
+                )}
+              </div>
+            </section>
+          )
+        )}
       </div>
     </nav>
   );
@@ -314,6 +341,7 @@ function UserCard({
           className="flex w-full items-center justify-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-3 py-2.5 text-sm font-semibold text-blue-700 transition hover:bg-blue-100 hover:text-blue-800 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-blue-200"
         >
           <KeyRound size={16} />
+
           Set / Change Password
         </Link>
 
@@ -350,27 +378,34 @@ function normalizeRole(
 
 export function AppSidebar() {
   const pathname = usePathname();
-  const router = useRouter();
 
-  const [mobileMenuOpen, setMobileMenuOpen] =
-    useState(false);
+  const [
+    mobileMenuOpen,
+    setMobileMenuOpen,
+  ] = useState(false);
 
   const [profile, setProfile] =
     useState<Profile | null>(null);
 
-  const [email, setEmail] = useState("");
+  const [email, setEmail] =
+    useState("");
 
-  const [signingOut, setSigningOut] =
-    useState(false);
+  const [
+    signingOut,
+    setSigningOut,
+  ] = useState(false);
 
   useEffect(() => {
     loadCurrentUser();
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(() => {
-      loadCurrentUser();
-    });
+    } =
+      supabase.auth.onAuthStateChange(
+        () => {
+          loadCurrentUser();
+        }
+      );
 
     return () => {
       subscription.unsubscribe();
@@ -390,11 +425,14 @@ export function AppSidebar() {
 
     setEmail(user.email ?? "");
 
-    const { data, error } = await supabase
-      .from("profiles")
-      .select("full_name, role")
-      .eq("id", user.id)
-      .maybeSingle();
+    const { data, error } =
+      await supabase
+        .from("profiles")
+        .select(
+          "full_name, role"
+        )
+        .eq("id", user.id)
+        .maybeSingle();
 
     if (error) {
       console.error(
@@ -410,6 +448,10 @@ export function AppSidebar() {
   }
 
   async function handleSignOut() {
+    if (signingOut) {
+      return;
+    }
+
     setSigningOut(true);
 
     const { error } =
@@ -422,6 +464,7 @@ export function AppSidebar() {
       );
 
       alert(error.message);
+
       setSigningOut(false);
       return;
     }
@@ -431,8 +474,9 @@ export function AppSidebar() {
     setMobileMenuOpen(false);
     setSigningOut(false);
 
-    router.replace("/login");
-    router.refresh();
+    window.location.replace(
+      "/login"
+    );
   }
 
   useEffect(() => {
@@ -441,18 +485,22 @@ export function AppSidebar() {
 
   useEffect(() => {
     if (!mobileMenuOpen) {
-      document.body.style.overflow = "";
+      document.body.style.overflow =
+        "";
       return;
     }
 
-    document.body.style.overflow = "hidden";
+    document.body.style.overflow =
+      "hidden";
 
     return () => {
-      document.body.style.overflow = "";
+      document.body.style.overflow =
+        "";
     };
   }, [mobileMenuOpen]);
 
-  const role = normalizeRole(profile?.role);
+  const role =
+    normalizeRole(profile?.role);
 
   return (
     <>
@@ -508,7 +556,9 @@ export function AppSidebar() {
             setMobileMenuOpen(true)
           }
           aria-label="Open navigation menu"
-          aria-expanded={mobileMenuOpen}
+          aria-expanded={
+            mobileMenuOpen
+          }
           className="flex h-11 w-11 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-slate-700 outline-none transition hover:bg-slate-100 focus-visible:ring-4 focus-visible:ring-blue-200"
         >
           <Menu
