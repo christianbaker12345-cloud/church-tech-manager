@@ -36,32 +36,55 @@ export default function EquipmentMaintenancePage() {
   const [equipmentItem, setEquipmentItem] =
     useState<EquipmentItem | null>(null);
 
-  const [records, setRecords] = useState<MaintenanceRecord[]>([]);
+  const [records, setRecords] =
+    useState<MaintenanceRecord[]>([]);
+
   const [showForm, setShowForm] = useState(false);
+
   const [editingRecord, setEditingRecord] =
     useState<MaintenanceRecord | null>(null);
 
   const [issueTitle, setIssueTitle] = useState("");
-  const [description, setDescription] = useState("");
+  const [description, setDescription] =
+    useState("");
+
   const [status, setStatus] =
     useState<MaintenanceStatus>("Open");
+
   const [priority, setPriority] =
     useState<MaintenancePriority>("Normal");
-  const [technician, setTechnician] = useState("");
-  const [repairCost, setRepairCost] = useState("");
-  const [openedDate, setOpenedDate] = useState(
-    new Date().toISOString().split("T")[0]
-  );
-  const [completedDate, setCompletedDate] = useState("");
-  const [nextServiceDate, setNextServiceDate] = useState("");
-  const [resolutionNotes, setResolutionNotes] = useState("");
 
-  const [accessChecking, setAccessChecking] = useState(true);
+  const [technician, setTechnician] =
+    useState("");
+
+  const [repairCost, setRepairCost] =
+    useState("");
+
+  const [openedDate, setOpenedDate] =
+    useState(
+      new Date().toISOString().split("T")[0]
+    );
+
+  const [completedDate, setCompletedDate] =
+    useState("");
+
+  const [nextServiceDate, setNextServiceDate] =
+    useState("");
+
+  const [resolutionNotes, setResolutionNotes] =
+    useState("");
+
+  const [accessChecking, setAccessChecking] =
+    useState(true);
+
   const [currentUserRole, setCurrentUserRole] =
     useState<UserRole>("Volunteer");
+
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [errorMessage, setErrorMessage] = useState("");
+
+  const [errorMessage, setErrorMessage] =
+    useState("");
 
   useEffect(() => {
     if (equipmentItemId) {
@@ -84,7 +107,10 @@ export default function EquipmentMaintenancePage() {
       return;
     }
 
-    const { data: profile, error: profileError } = await supabase
+    const {
+      data: profile,
+      error: profileError,
+    } = await supabase
       .from("profiles")
       .select("role")
       .eq("id", user.id)
@@ -95,6 +121,7 @@ export default function EquipmentMaintenancePage() {
         "Unable to verify maintenance access:",
         profileError
       );
+
       setCurrentUserRole("Volunteer");
     } else {
       const role: UserRole =
@@ -126,13 +153,22 @@ export default function EquipmentMaintenancePage() {
 
     const itemResult = await supabase
       .from("assets")
-      .select("id,asset_tag,display_name,status")
+      .select(
+        "id,asset_tag,display_name,status"
+      )
       .eq("id", equipmentItemId)
       .maybeSingle();
 
     if (itemResult.error) {
-      console.error("Equipment load error:", itemResult.error);
-      setErrorMessage(itemResult.error.message);
+      console.error(
+        "Equipment load error:",
+        itemResult.error
+      );
+
+      setErrorMessage(
+        itemResult.error.message
+      );
+
       setEquipmentItem(null);
       setLoading(false);
       return;
@@ -142,29 +178,39 @@ export default function EquipmentMaintenancePage() {
       setErrorMessage(
         "No equipment item was found with this ID."
       );
+
       setEquipmentItem(null);
       setLoading(false);
       return;
     }
 
-    setEquipmentItem(itemResult.data as EquipmentItem);
+    setEquipmentItem(
+      itemResult.data as EquipmentItem
+    );
 
     const maintenanceResult = await supabase
       .from("asset_maintenance")
       .select("*")
       .eq("asset_id", equipmentItemId)
-      .order("created_at", { ascending: false });
+      .order("created_at", {
+        ascending: false,
+      });
 
     if (maintenanceResult.error) {
       console.error(
         "Maintenance load error:",
         maintenanceResult.error
       );
-      setErrorMessage(maintenanceResult.error.message);
+
+      setErrorMessage(
+        maintenanceResult.error.message
+      );
+
       setRecords([]);
     } else {
       setRecords(
-        (maintenanceResult.data ?? []) as MaintenanceRecord[]
+        (maintenanceResult.data ??
+          []) as MaintenanceRecord[]
       );
     }
 
@@ -184,7 +230,10 @@ export default function EquipmentMaintenancePage() {
       .from("asset_maintenance")
       .select("id")
       .eq("asset_id", equipmentItemId)
-      .in("status", ["Open", "In Progress"])
+      .in("status", [
+        "Open",
+        "In Progress",
+      ])
       .limit(1);
 
     if (error) {
@@ -192,24 +241,32 @@ export default function EquipmentMaintenancePage() {
         "Maintenance status check error:",
         error
       );
+
       throw error;
     }
 
-    const hasActiveMaintenance = (data ?? []).length > 0;
-    const nextEquipmentStatus = hasActiveMaintenance
-      ? "Maintenance"
-      : "Available";
+    const hasActiveMaintenance =
+      (data ?? []).length > 0;
 
-    const { error: updateError } = await supabase
-      .from("assets")
-      .update({ status: nextEquipmentStatus })
-      .eq("id", equipmentItemId);
+    const nextEquipmentStatus =
+      hasActiveMaintenance
+        ? "Maintenance"
+        : "Available";
+
+    const { error: updateError } =
+      await supabase
+        .from("assets")
+        .update({
+          status: nextEquipmentStatus,
+        })
+        .eq("id", equipmentItemId);
 
     if (updateError) {
       console.error(
         "Equipment status update error:",
         updateError
       );
+
       throw updateError;
     }
   }
@@ -222,7 +279,11 @@ export default function EquipmentMaintenancePage() {
     setPriority("Normal");
     setTechnician("");
     setRepairCost("");
-    setOpenedDate(new Date().toISOString().split("T")[0]);
+
+    setOpenedDate(
+      new Date().toISOString().split("T")[0]
+    );
+
     setCompletedDate("");
     setNextServiceDate("");
     setResolutionNotes("");
@@ -233,6 +294,7 @@ export default function EquipmentMaintenancePage() {
       alert(
         "You do not have permission to add maintenance records."
       );
+
       return;
     }
 
@@ -240,30 +302,102 @@ export default function EquipmentMaintenancePage() {
     setShowForm(true);
   }
 
-  function editRecord(record: MaintenanceRecord) {
+  function editRecord(
+    record: MaintenanceRecord
+  ) {
     if (!canManageMaintenance()) {
       alert(
         "You do not have permission to edit maintenance records."
       );
+
       return;
     }
 
     setEditingRecord(record);
     setIssueTitle(record.issue_title);
-    setDescription(record.description ?? "");
+    setDescription(
+      record.description ?? ""
+    );
     setStatus(record.status);
     setPriority(record.priority);
-    setTechnician(record.technician ?? "");
+    setTechnician(
+      record.technician ?? ""
+    );
+
     setRepairCost(
       record.repair_cost !== null
         ? String(record.repair_cost)
         : ""
     );
+
     setOpenedDate(record.opened_date);
-    setCompletedDate(record.completed_date ?? "");
-    setNextServiceDate(record.next_service_date ?? "");
-    setResolutionNotes(record.resolution_notes ?? "");
+
+    setCompletedDate(
+      record.completed_date ?? ""
+    );
+
+    setNextServiceDate(
+      record.next_service_date ?? ""
+    );
+
+    setResolutionNotes(
+      record.resolution_notes ?? ""
+    );
+
     setShowForm(true);
+  }
+
+  function completeRepair(
+    record: MaintenanceRecord
+  ) {
+    if (!canManageMaintenance()) {
+      alert(
+        "You do not have permission to complete maintenance records."
+      );
+
+      return;
+    }
+
+    setEditingRecord(record);
+    setIssueTitle(record.issue_title);
+
+    setDescription(
+      record.description ?? ""
+    );
+
+    setStatus("Completed");
+    setPriority(record.priority);
+
+    setTechnician(
+      record.technician ?? ""
+    );
+
+    setRepairCost(
+      record.repair_cost !== null
+        ? String(record.repair_cost)
+        : ""
+    );
+
+    setOpenedDate(record.opened_date);
+
+    setCompletedDate(
+      new Date().toISOString().split("T")[0]
+    );
+
+    setNextServiceDate(
+      record.next_service_date ?? ""
+    );
+
+    setResolutionNotes(
+      record.resolution_notes ?? ""
+    );
+
+    setShowForm(true);
+
+    window.scrollTo({
+      top: 0,
+      behavior: "smooth",
+    });
   }
 
   function closeForm() {
@@ -280,6 +414,7 @@ export default function EquipmentMaintenancePage() {
       alert(
         "You do not have permission to save maintenance records."
       );
+
       return;
     }
 
@@ -291,37 +426,58 @@ export default function EquipmentMaintenancePage() {
     }
 
     const parsedRepairCost =
-      repairCost.trim() === "" ? null : Number(repairCost);
+      repairCost.trim() === ""
+        ? null
+        : Number(repairCost);
 
     if (
       parsedRepairCost !== null &&
       (Number.isNaN(parsedRepairCost) ||
         parsedRepairCost < 0)
     ) {
-      alert("Enter a valid repair cost.");
+      alert(
+        "Enter a valid repair cost."
+      );
+
       return;
     }
 
     setSaving(true);
     setErrorMessage("");
 
+    const today =
+      new Date().toISOString().split("T")[0];
+
     const recordData = {
       asset_id: equipmentItemId,
       issue_title: issueTitle.trim(),
-      description: description.trim() || null,
+
+      description:
+        description.trim() || null,
+
       status,
       priority,
-      technician: technician.trim() || null,
+
+      technician:
+        technician.trim() || null,
+
       repair_cost: parsedRepairCost,
+
       opened_date: openedDate,
+
       completed_date:
         status === "Completed"
-          ? completedDate ||
-            new Date().toISOString().split("T")[0]
-          : completedDate || null,
-      next_service_date: nextServiceDate || null,
-      resolution_notes: resolutionNotes.trim() || null,
-      updated_at: new Date().toISOString(),
+          ? completedDate || today
+          : null,
+
+      next_service_date:
+        nextServiceDate || null,
+
+      resolution_notes:
+        resolutionNotes.trim() || null,
+
+      updated_at:
+        new Date().toISOString(),
     };
 
     const result = editingRecord
@@ -334,8 +490,15 @@ export default function EquipmentMaintenancePage() {
           .insert(recordData);
 
     if (result.error) {
-      console.error("Maintenance save error:", result.error);
-      setErrorMessage(result.error.message);
+      console.error(
+        "Maintenance save error:",
+        result.error
+      );
+
+      setErrorMessage(
+        result.error.message
+      );
+
       setSaving(false);
       return;
     }
@@ -350,20 +513,25 @@ export default function EquipmentMaintenancePage() {
 
       setErrorMessage(message);
       setSaving(false);
+
       await loadPage();
       return;
     }
 
     setSaving(false);
     closeForm();
+
     await loadPage();
   }
 
-  async function deleteRecord(record: MaintenanceRecord) {
+  async function deleteRecord(
+    record: MaintenanceRecord
+  ) {
     if (!canManageMaintenance()) {
       alert(
         "You do not have permission to delete maintenance records."
       );
+
       return;
     }
 
@@ -379,9 +547,19 @@ export default function EquipmentMaintenancePage() {
       .eq("id", record.id);
 
     if (error) {
-      console.error("Maintenance delete error:", error);
+      console.error(
+        "Maintenance delete error:",
+        error
+      );
+
       alert(error.message);
       return;
+    }
+
+    if (
+      editingRecord?.id === record.id
+    ) {
+      closeForm();
     }
 
     try {
@@ -398,7 +576,10 @@ export default function EquipmentMaintenancePage() {
     await loadPage();
   }
 
-  if (accessChecking || loading) {
+  if (
+    accessChecking ||
+    loading
+  ) {
     return (
       <div className="p-8">
         <h1 className="text-3xl font-bold">
@@ -436,7 +617,8 @@ export default function EquipmentMaintenancePage() {
     equipmentItem.asset_tag ||
     "Unnamed Equipment";
 
-  const canManage = canManageMaintenance();
+  const canManage =
+    canManageMaintenance();
 
   return (
     <div className="p-8">
@@ -459,12 +641,17 @@ export default function EquipmentMaintenancePage() {
 
           <p className="mt-2 text-gray-500">
             Equipment Tag:{" "}
-            {equipmentItem.asset_tag || "Not assigned"}
+            {equipmentItem.asset_tag ||
+              "Not assigned"}
           </p>
         </div>
 
-        {canManage && (
-          <Button onClick={openNewRecordForm}>
+        {canManage && !showForm && (
+          <Button
+            onClick={
+              openNewRecordForm
+            }
+          >
             Add Maintenance Record
           </Button>
         )}
@@ -478,7 +665,9 @@ export default function EquipmentMaintenancePage() {
 
       {canManage && showForm && (
         <MaintenanceForm
-          isEditing={editingRecord !== null}
+          isEditing={
+            editingRecord !== null
+          }
           saving={saving}
           issueTitle={issueTitle}
           description={description}
@@ -487,19 +676,45 @@ export default function EquipmentMaintenancePage() {
           technician={technician}
           repairCost={repairCost}
           openedDate={openedDate}
-          completedDate={completedDate}
-          nextServiceDate={nextServiceDate}
-          resolutionNotes={resolutionNotes}
-          onIssueTitleChange={setIssueTitle}
-          onDescriptionChange={setDescription}
-          onStatusChange={setStatus}
-          onPriorityChange={setPriority}
-          onTechnicianChange={setTechnician}
-          onRepairCostChange={setRepairCost}
-          onOpenedDateChange={setOpenedDate}
-          onCompletedDateChange={setCompletedDate}
-          onNextServiceDateChange={setNextServiceDate}
-          onResolutionNotesChange={setResolutionNotes}
+          completedDate={
+            completedDate
+          }
+          nextServiceDate={
+            nextServiceDate
+          }
+          resolutionNotes={
+            resolutionNotes
+          }
+          onIssueTitleChange={
+            setIssueTitle
+          }
+          onDescriptionChange={
+            setDescription
+          }
+          onStatusChange={
+            setStatus
+          }
+          onPriorityChange={
+            setPriority
+          }
+          onTechnicianChange={
+            setTechnician
+          }
+          onRepairCostChange={
+            setRepairCost
+          }
+          onOpenedDateChange={
+            setOpenedDate
+          }
+          onCompletedDateChange={
+            setCompletedDate
+          }
+          onNextServiceDateChange={
+            setNextServiceDate
+          }
+          onResolutionNotesChange={
+            setResolutionNotes
+          }
           onSubmit={saveRecord}
           onCancel={closeForm}
         />
@@ -511,7 +726,8 @@ export default function EquipmentMaintenancePage() {
         </h2>
 
         <p className="mt-2 text-gray-500">
-          Issues, repairs, service costs, and future maintenance.
+          Issues, repairs, service costs,
+          and future maintenance.
         </p>
 
         <div className="mt-8">
@@ -523,8 +739,25 @@ export default function EquipmentMaintenancePage() {
                 ? "Create the first record when this equipment needs service."
                 : "No maintenance records have been added for this equipment."
             }
-            onEdit={canManage ? editRecord : undefined}
-            onDelete={canManage ? deleteRecord : undefined}
+            editingRecordId={
+              editingRecord?.id ??
+              null
+            }
+            onEdit={
+              canManage
+                ? editRecord
+                : undefined
+            }
+            onComplete={
+              canManage
+                ? completeRepair
+                : undefined
+            }
+            onDelete={
+              canManage
+                ? deleteRecord
+                : undefined
+            }
           />
         </div>
       </div>

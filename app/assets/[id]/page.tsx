@@ -699,11 +699,12 @@ export default function AssetDetailsPage() {
       <div className="mt-6 grid gap-8 lg:grid-cols-3">
         <div className="rounded-2xl bg-white p-8 shadow lg:col-span-2">
           <AssetHeader
-            title={displayName}
-            assetTag={asset.asset_tag}
-            status={asset.status}
-            statusClasses={statusClasses}
-          />
+  assetId={asset.id}
+  title={displayName}
+  assetTag={asset.asset_tag}
+  status={asset.status}
+  statusClasses={statusClasses}
+/>
 
           <AssetInformation
             asset={asset}

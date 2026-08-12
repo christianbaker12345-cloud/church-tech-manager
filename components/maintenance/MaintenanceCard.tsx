@@ -12,14 +12,18 @@ import {
 type MaintenanceCardProps = {
   record: MaintenanceRecord;
   showEquipment?: boolean;
+  editingRecordId?: string | null;
   onEdit?: (record: MaintenanceRecord) => void;
+  onComplete?: (record: MaintenanceRecord) => void;
   onDelete?: (record: MaintenanceRecord) => void;
 };
 
 export default function MaintenanceCard({
   record,
   showEquipment = false,
+  editingRecordId = null,
   onEdit,
+  onComplete,
   onDelete,
 }: MaintenanceCardProps) {
   const equipment = getEquipment(record);
@@ -28,6 +32,13 @@ export default function MaintenanceCard({
     equipment?.display_name ||
     equipment?.asset_tag ||
     "Unnamed Equipment";
+
+  const isActive =
+    record.status === "Open" ||
+    record.status === "In Progress";
+
+  const isBeingEdited =
+    editingRecordId === record.id;
 
   return (
     <article className="rounded-xl border p-6">
@@ -71,11 +82,23 @@ export default function MaintenanceCard({
         <div className="flex flex-wrap gap-3">
           {showEquipment && (
             <Link href={`/assets/${record.asset_id}`}>
-              <Button variant="outline">View Equipment</Button>
+              <Button variant="outline">
+                View Equipment
+              </Button>
             </Link>
           )}
 
-          {onEdit && (
+          {isActive && onComplete && (
+            <Button
+              type="button"
+              onClick={() => onComplete(record)}
+              className="bg-emerald-600 text-white hover:bg-emerald-700"
+            >
+              Complete Repair
+            </Button>
+          )}
+
+          {onEdit && !isBeingEdited && (
             <Button
               type="button"
               variant="outline"
@@ -97,39 +120,57 @@ export default function MaintenanceCard({
         </div>
       </div>
 
-      <div className="mt-6 grid gap-5 border-t pt-5 md:grid-cols-2 lg:grid-cols-5">
+      <div className="mt-6 grid gap-6 border-t pt-6 sm:grid-cols-2 lg:grid-cols-5">
         <div>
-          <p className="text-sm text-gray-500">Technician</p>
+          <p className="text-sm text-gray-500">
+            Technician
+          </p>
           <p className="mt-1 font-semibold">
-            {record.technician || "Unassigned"}
+            {record.technician || "—"}
           </p>
         </div>
 
         <div>
-          <p className="text-sm text-gray-500">Repair Cost</p>
+          <p className="text-sm text-gray-500">
+            Repair Cost
+          </p>
           <p className="mt-1 font-semibold">
-            {formatMaintenanceCurrency(record.repair_cost)}
+            {formatMaintenanceCurrency(
+              record.repair_cost
+            )}
           </p>
         </div>
 
         <div>
-          <p className="text-sm text-gray-500">Opened</p>
+          <p className="text-sm text-gray-500">
+            Opened
+          </p>
           <p className="mt-1 font-semibold">
-            {formatMaintenanceDate(record.opened_date)}
+            {formatMaintenanceDate(
+              record.opened_date
+            )}
           </p>
         </div>
 
         <div>
-          <p className="text-sm text-gray-500">Completed</p>
+          <p className="text-sm text-gray-500">
+            Completed
+          </p>
           <p className="mt-1 font-semibold">
-            {formatMaintenanceDate(record.completed_date)}
+            {formatMaintenanceDate(
+              record.completed_date
+            )}
           </p>
         </div>
 
         <div>
-          <p className="text-sm text-gray-500">Next Service</p>
+          <p className="text-sm text-gray-500">
+            Next Service
+          </p>
           <p className="mt-1 font-semibold">
-            {formatMaintenanceDate(record.next_service_date)}
+            {formatMaintenanceDate(
+              record.next_service_date
+            )}
           </p>
         </div>
       </div>
@@ -145,6 +186,7 @@ export default function MaintenanceCard({
           <p className="text-sm font-medium text-gray-500">
             Resolution
           </p>
+
           <p className="mt-2 text-gray-700">
             {record.resolution_notes}
           </p>
