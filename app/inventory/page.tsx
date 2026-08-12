@@ -282,73 +282,165 @@ export default function InventoryPage() {
   const canManageEquipment =
     role === "Admin" || role === "Staff";
 
-  const effectiveStatusByEquipmentId = useMemo(() => {
-    const statusesByEquipment = new Map<
+  type AssetStatusCounts = {
+    total: number;
+    available: number;
+    checkedOut: number;
+    maintenance: number;
+    other: number;
+  };
+
+  const assetStatusCountsByEquipmentId = useMemo(() => {
+    const counts = new Map<
       string,
-      string[]
+      AssetStatusCounts
     >();
 
     for (const asset of assets) {
       if (!asset.equipment_id) continue;
 
-      const statuses =
-        statusesByEquipment.get(
-          asset.equipment_id
-        ) ?? [];
+      const current =
+        counts.get(asset.equipment_id) ?? {
+          total: 0,
+          available: 0,
+          checkedOut: 0,
+          maintenance: 0,
+          other: 0,
+        };
 
-      statuses.push(normalizeStatus(asset.status));
+      const status = normalizeStatus(asset.status);
 
-      statusesByEquipment.set(
-        asset.equipment_id,
-        statuses
-      );
+      current.total += 1;
+
+      if (status === "available") {
+        current.available += 1;
+      } else if (status === "checked out") {
+        current.checkedOut += 1;
+      } else if (
+        status === "maintenance" ||
+        status === "in repair"
+      ) {
+        current.maintenance += 1;
+      } else {
+        current.other += 1;
+      }
+
+      counts.set(asset.equipment_id, current);
     }
 
-    const effectiveStatuses = new Map<
-      string,
-      string | null
-    >();
+    return counts;
+  }, [assets]);
 
-    for (const item of equipment) {
-      const assetStatuses =
-        statusesByEquipment.get(item.id) ?? [];
+  function getAssetStatusCounts(
+    item: Equipment
+  ): AssetStatusCounts {
+    const tracked =
+      assetStatusCountsByEquipmentId.get(item.id);
 
-      const hasMaintenanceAsset =
-        assetStatuses.some(
-          (status) =>
-            status === "maintenance" ||
-            status === "in repair"
-        );
+    const quantity = Number(item.quantity) || 0;
 
-      const hasCheckedOutAsset =
-        assetStatuses.some(
-          (status) => status === "checked out"
-        );
-
-      const effectiveStatus =
-        hasMaintenanceAsset
-          ? "Maintenance"
-          : hasCheckedOutAsset
-            ? "Checked Out"
-            : item.status;
-
-      effectiveStatuses.set(
-        item.id,
-        effectiveStatus
+    if (tracked) {
+      const untracked = Math.max(
+        quantity - tracked.total,
+        0
       );
+
+      return {
+        total: Math.max(quantity, tracked.total),
+        available:
+          tracked.available + untracked,
+        checkedOut: tracked.checkedOut,
+        maintenance: tracked.maintenance,
+        other: tracked.other,
+      };
     }
 
-    return effectiveStatuses;
-  }, [equipment, assets]);
+    const status = normalizeStatus(item.status);
+
+    return {
+      total: quantity,
+      available:
+        status === "available" ? quantity : 0,
+      checkedOut:
+        status === "checked out" ? quantity : 0,
+      maintenance:
+        status === "maintenance" ||
+        status === "in repair"
+          ? quantity
+          : 0,
+      other:
+        status !== "available" &&
+        status !== "checked out" &&
+        status !== "maintenance" &&
+        status !== "in repair"
+          ? quantity
+          : 0,
+    };
+  }
+
+  function getStatusesForEquipment(
+    item: Equipment
+  ) {
+    const counts = getAssetStatusCounts(item);
+    const values: string[] = [];
+
+    if (counts.available > 0) {
+      values.push("Available");
+    }
+
+    if (counts.checkedOut > 0) {
+      values.push("Checked Out");
+    }
+
+    if (counts.maintenance > 0) {
+      values.push("Maintenance");
+    }
+
+    if (counts.other > 0 && item.status) {
+      const fallback = item.status.trim();
+
+      if (
+        fallback &&
+        !values.some(
+          (value) =>
+            normalizeStatus(value) ===
+            normalizeStatus(fallback)
+        )
+      ) {
+        values.push(fallback);
+      }
+    }
+
+    if (values.length === 0 && item.status) {
+      values.push(item.status);
+    }
+
+    return values;
+  }
 
   function getEffectiveStatus(
     item: Equipment
   ) {
-    return (
-      effectiveStatusByEquipmentId.get(
-        item.id
-      ) ?? item.status
-    );
+    const statuses =
+      getStatusesForEquipment(item);
+
+    if (statuses.length === 1) {
+      return statuses[0];
+    }
+
+    if (statuses.includes("Available")) {
+      return "Available";
+    }
+
+    if (statuses.includes("Checked Out")) {
+      return "Checked Out";
+    }
+
+    if (statuses.includes("Maintenance")) {
+      return "Maintenance";
+    }
+
+    return item.status;
   }
 
   const categories = useMemo(() => {
@@ -365,17 +457,18 @@ export default function InventoryPage() {
   }, [equipment]);
 
   const statuses = useMemo(() => {
-    const values = equipment
-      .map((item) => getEffectiveStatus(item))
-      .filter(
-        (status): status is string =>
-          Boolean(status && status.trim())
-      );
+    const values = equipment.flatMap((item) =>
+      getStatusesForEquipment(item)
+    );
 
     return Array.from(
-      new Set(values)
+      new Set(
+        values.filter((status) =>
+          Boolean(status && status.trim())
+        )
+      )
     ).sort();
-  }, [equipment, effectiveStatusByEquipmentId]);
+  }, [equipment, assetStatusCountsByEquipmentId]);
 
   const filteredEquipment = useMemo(() => {
     const normalizedSearch = search
@@ -408,9 +501,12 @@ export default function InventoryPage() {
         categoryFilter === "All" ||
         item.category === categoryFilter;
 
+      const equipmentStatuses =
+        getStatusesForEquipment(item);
+
       const matchesStatus =
         statusFilter === "All" ||
-        effectiveStatus === statusFilter;
+        equipmentStatuses.includes(statusFilter);
 
       return (
         matchesSearch &&
@@ -423,7 +519,7 @@ export default function InventoryPage() {
     search,
     categoryFilter,
     statusFilter,
-    effectiveStatusByEquipmentId,
+    assetStatusCountsByEquipmentId,
   ]);
 
   const summary = useMemo(() => {
@@ -439,26 +535,20 @@ export default function InventoryPage() {
 
       available: equipment.filter(
         (item) =>
-          normalizeStatus(
-            getEffectiveStatus(item)
-          ) === "available"
+          getAssetStatusCounts(item).available > 0
       ).length,
 
-      attention: equipment.filter(
-        (item) => {
-          const status = normalizeStatus(
-            getEffectiveStatus(item)
-          );
+      attention: equipment.filter((item) => {
+        const counts =
+          getAssetStatusCounts(item);
 
-          return (
-            status === "maintenance" ||
-            status === "in repair" ||
-            status === "checked out"
-          );
-        }
-      ).length,
+        return (
+          counts.maintenance > 0 ||
+          counts.checkedOut > 0
+        );
+      }).length,
     };
-  }, [equipment, effectiveStatusByEquipmentId]);
+  }, [equipment, assetStatusCountsByEquipmentId]);
 
   function clearFilters() {
     setSearch("");
@@ -1023,14 +1113,66 @@ export default function InventoryPage() {
                       </td>
 
                       <td className="px-6 py-5">
-                        <span
-                          className={`inline-flex rounded-full px-3 py-1 text-sm font-semibold ${statusClasses(
-                            getEffectiveStatus(item)
-                          )}`}
-                        >
-                          {getEffectiveStatus(item) ||
-                            "Unknown"}
-                        </span>
+                        {(() => {
+                          const counts =
+                            getAssetStatusCounts(item);
+
+                          const badges = [
+                            counts.available > 0
+                              ? {
+                                  label: `${counts.available} Available`,
+                                  status: "Available",
+                                }
+                              : null,
+                            counts.checkedOut > 0
+                              ? {
+                                  label: `${counts.checkedOut} Checked Out`,
+                                  status: "Checked Out",
+                                }
+                              : null,
+                            counts.maintenance > 0
+                              ? {
+                                  label: `${counts.maintenance} Maintenance`,
+                                  status: "Maintenance",
+                                }
+                              : null,
+                          ].filter(
+                            (
+                              badge
+                            ): badge is {
+                              label: string;
+                              status: string;
+                            } => badge !== null
+                          );
+
+                          if (badges.length === 0) {
+                            return (
+                              <span
+                                className={`inline-flex rounded-full px-3 py-1 text-sm font-semibold ${statusClasses(
+                                  getEffectiveStatus(item)
+                                )}`}
+                              >
+                                {getEffectiveStatus(item) ||
+                                  "Unknown"}
+                              </span>
+                            );
+                          }
+
+                          return (
+                            <div className="flex flex-wrap gap-2">
+                              {badges.map((badge) => (
+                                <span
+                                  key={badge.status}
+                                  className={`inline-flex whitespace-nowrap rounded-full px-3 py-1 text-sm font-semibold ${statusClasses(
+                                    badge.status
+                                  )}`}
+                                >
+                                  {badge.label}
+                                </span>
+                              ))}
+                            </div>
+                          );
+                        })()}
                       </td>
 
                       <td className="px-6 py-5 text-slate-700">

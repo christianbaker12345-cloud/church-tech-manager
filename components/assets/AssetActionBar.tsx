@@ -48,9 +48,9 @@ export default function AssetActionBar({
       </div>
 
 <div
-  className={`mt-8 grid gap-4 md:grid-cols-2 ${
+  className={`mt-8 grid gap-5 md:grid-cols-2 ${
     canManage
-      ? "xl:grid-cols-5"
+      ? "xl:grid-cols-4"
       : "xl:max-w-2xl xl:grid-cols-2"
   }`}
 >
@@ -66,7 +66,7 @@ export default function AssetActionBar({
               className="block"
             >
               <Button className="w-full">
-                Edit Equipment
+                Edit
               </Button>
             </Link>
           </ActionCard>
@@ -110,7 +110,7 @@ export default function AssetActionBar({
               className="w-full"
               onClick={onShowCheckoutForm}
             >
-              Transfer Equipment
+              Transfer
             </Button>
           </ActionCard>
         )}
@@ -145,7 +145,7 @@ export default function AssetActionBar({
             variant="outline"
             onClick={onPrintQRCode}
           >
-            Print QR Code
+            Print QR
           </Button>
         </ActionCard>
       </div>
@@ -198,16 +198,16 @@ function ActionCard({
       className={`flex flex-col rounded-2xl border p-5 transition hover:-translate-y-1 hover:bg-white hover:shadow-md ${colors.card}`}
     >
       <div
-        className={`flex h-12 w-12 items-center justify-center rounded-xl text-2xl shadow-sm ${colors.icon}`}
+        className={`mx-auto flex h-12 w-12 items-center justify-center rounded-xl text-2xl shadow-sm ${colors.icon}`}
       >
         {icon}
       </div>
 
-<h3 className="mt-4 text-center text-lg font-semibold text-slate-950">
-  {title}
-</h3>
+      <h3 className="mt-4 w-full text-center text-lg font-semibold text-slate-950">
+        {title}
+      </h3>
 
-      <p className="mt-2 min-h-[72px] text-sm leading-6 text-slate-500">
+      <p className="mt-2 min-h-[72px] text-center text-sm leading-6 text-slate-500">
         {description}
       </p>
 
