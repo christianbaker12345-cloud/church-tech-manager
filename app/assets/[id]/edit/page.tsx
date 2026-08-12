@@ -6,6 +6,8 @@ import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 
+type UserRole = "Admin" | "Staff" | "Volunteer";
+
 type Asset = {
   id: string;
   equipment_id: string | null;
@@ -71,15 +73,65 @@ export default function EditAssetPage() {
   const [warrantyExpires, setWarrantyExpires] = useState("");
   const [notes, setNotes] = useState("");
 
+  const [accessChecking, setAccessChecking] = useState(true);
+  const [currentUserRole, setCurrentUserRole] =
+    useState<UserRole>("Volunteer");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
 
   useEffect(() => {
     if (assetId) {
-      loadAsset();
+      initializePage();
     }
   }, [assetId]);
+
+  async function initializePage() {
+    setAccessChecking(true);
+
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser();
+
+    if (userError || !user) {
+      setCurrentUserRole("Volunteer");
+      setLoading(false);
+      setAccessChecking(false);
+      return;
+    }
+
+    const { data: profile, error: profileError } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", user.id)
+      .maybeSingle();
+
+    if (profileError) {
+      console.error("Unable to verify asset-edit access:", profileError);
+      setCurrentUserRole("Volunteer");
+      setLoading(false);
+      setAccessChecking(false);
+      return;
+    }
+
+    const role: UserRole =
+      profile?.role === "Admin"
+        ? "Admin"
+        : profile?.role === "Staff"
+          ? "Staff"
+          : "Volunteer";
+
+    setCurrentUserRole(role);
+
+    if (role === "Admin" || role === "Staff") {
+      await loadAsset();
+    } else {
+      setLoading(false);
+    }
+
+    setAccessChecking(false);
+  }
 
   async function loadAsset() {
     if (!assetId) return;
@@ -152,6 +204,14 @@ export default function EditAssetPage() {
   async function saveAsset(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
+    if (
+      currentUserRole !== "Admin" &&
+      currentUserRole !== "Staff"
+    ) {
+      alert("You do not have permission to edit assets.");
+      return;
+    }
+
     if (!asset || !assetId) return;
 
     if (!displayName.trim()) {
@@ -221,6 +281,47 @@ export default function EditAssetPage() {
 
     router.push(`/assets/${assetId}`);
     router.refresh();
+  }
+
+  if (accessChecking) {
+    return (
+      <div className="p-8">
+        <h1 className="text-3xl font-bold">Verifying permissions...</h1>
+      </div>
+    );
+  }
+
+  if (
+    currentUserRole !== "Admin" &&
+    currentUserRole !== "Staff"
+  ) {
+    return (
+      <div className="max-w-4xl p-8">
+        <Link
+          href={assetId ? `/assets/${assetId}` : "/inventory"}
+          className="text-blue-600 hover:underline"
+        >
+          ← Back to Asset
+        </Link>
+
+        <div className="mt-6 rounded-2xl border border-amber-200 bg-amber-50 p-8 shadow-sm">
+          <p className="text-sm font-semibold uppercase tracking-[0.16em] text-amber-700">
+            Volunteer Access
+          </p>
+          <h1 className="mt-3 text-3xl font-bold text-slate-950">
+            This page is read-only for your account.
+          </h1>
+          <p className="mt-3 max-w-2xl leading-7 text-slate-600">
+            Volunteers can view asset details, photos, QR codes, and checkout history. Editing assets requires a Staff or Admin account.
+          </p>
+          <div className="mt-6">
+            <Link href={assetId ? `/assets/${assetId}` : "/inventory"}>
+              <Button>Return to Asset</Button>
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   if (loading) {

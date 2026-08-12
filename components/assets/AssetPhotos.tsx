@@ -2,7 +2,7 @@
 
 import { Button } from "@/components/ui/button";
 
-export type AssetPhoto = {
+type AssetPhoto = {
   id: string;
   asset_id: string;
   image_url: string;
@@ -22,6 +22,7 @@ type AssetPhotosProps = {
   onPhotoCaptionChange: (caption: string) => void;
   onUploadPhoto: () => void;
   onDeletePhoto: (photo: AssetPhoto) => void;
+  canManage: boolean;
 };
 
 export default function AssetPhotos({
@@ -36,6 +37,7 @@ export default function AssetPhotos({
   onPhotoCaptionChange,
   onUploadPhoto,
   onDeletePhoto,
+  canManage,
 }: AssetPhotosProps) {
   return (
     <div className="mt-8 rounded-2xl bg-white p-8 shadow">
@@ -44,7 +46,9 @@ export default function AssetPhotos({
           <h2 className="text-3xl font-bold">Equipment Photos</h2>
 
           <p className="mt-2 text-gray-500">
-            Add identification, serial-number, damage, and receipt photos.
+            {canManage
+              ? "Add identification, serial-number, damage, and receipt photos."
+              : "Identification, serial-number, damage, and receipt photos."}
           </p>
         </div>
 
@@ -53,56 +57,60 @@ export default function AssetPhotos({
         </span>
       </div>
 
-      <div className="mt-8 rounded-xl border bg-gray-50 p-6">
-        <div className="grid gap-5 md:grid-cols-2">
-          <div>
-            <label className="mb-2 block font-medium">Photo</label>
+      {canManage && (
+        <div className="mt-8 rounded-xl border bg-gray-50 p-6">
+          <div className="grid gap-5 md:grid-cols-2">
+            <div>
+              <label className="mb-2 block font-medium">Photo</label>
 
-            <input
-              id="asset-photo-input"
-              type="file"
-              accept="image/*"
-              className="block w-full rounded-lg border bg-white p-3 text-sm"
-              onChange={(event) =>
-                onPhotoFileChange(event.target.files?.[0] ?? null)
-              }
-            />
+              <input
+                id="asset-photo-input"
+                type="file"
+                accept="image/*"
+                className="block w-full rounded-lg border bg-white p-3 text-sm"
+                onChange={(event) =>
+                  onPhotoFileChange(event.target.files?.[0] ?? null)
+                }
+              />
 
-            <p className="mt-2 text-sm text-gray-500">
-              JPG, PNG, HEIC, or another image format up to 10 MB.
-            </p>
+              <p className="mt-2 text-sm text-gray-500">
+                JPG, PNG, HEIC, or another image format up to 10 MB.
+              </p>
+            </div>
+
+            <div>
+              <label className="mb-2 block font-medium">Caption</label>
+
+              <input
+                type="text"
+                value={photoCaption}
+                onChange={(event) =>
+                  onPhotoCaptionChange(event.target.value)
+                }
+                className="w-full rounded-lg border bg-white p-3"
+                placeholder="Front, serial number, damage, receipt..."
+              />
+            </div>
           </div>
 
-          <div>
-            <label className="mb-2 block font-medium">Caption</label>
-
-            <input
-              type="text"
-              value={photoCaption}
-              onChange={(event) =>
-                onPhotoCaptionChange(event.target.value)
-              }
-              className="w-full rounded-lg border bg-white p-3"
-              placeholder="Front, serial number, damage, receipt..."
-            />
-          </div>
+          <Button
+            className="mt-5"
+            onClick={onUploadPhoto}
+            disabled={!hasSelectedPhoto || uploadingPhoto}
+          >
+            {uploadingPhoto ? "Uploading Photo..." : "Upload Photo"}
+          </Button>
         </div>
-
-        <Button
-          className="mt-5"
-          onClick={onUploadPhoto}
-          disabled={!hasSelectedPhoto || uploadingPhoto}
-        >
-          {uploadingPhoto ? "Uploading Photo..." : "Upload Photo"}
-        </Button>
-      </div>
+      )}
 
       {photos.length === 0 ? (
         <div className="mt-8 rounded-xl border border-dashed p-10 text-center">
           <h3 className="text-xl font-semibold">No photos yet</h3>
 
           <p className="mt-2 text-gray-500">
-            Upload the first photo for this equipment item.
+            {canManage
+              ? "Upload the first photo for this equipment item."
+              : "No photos have been added for this equipment item."}
           </p>
         </div>
       ) : (
@@ -118,6 +126,7 @@ export default function AssetPhotos({
                 rel="noreferrer"
                 className="block"
               >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={photo.image_url}
                   alt={photo.caption || displayName}
@@ -134,17 +143,19 @@ export default function AssetPhotos({
                   Added {formatDate(photo.created_at)}
                 </p>
 
-                <Button
-                  className="mt-4"
-                  type="button"
-                  variant="outline"
-                  onClick={() => onDeletePhoto(photo)}
-                  disabled={deletingPhotoId === photo.id}
-                >
-                  {deletingPhotoId === photo.id
-                    ? "Deleting..."
-                    : "Delete Photo"}
-                </Button>
+                {canManage && (
+                  <Button
+                    className="mt-4"
+                    type="button"
+                    variant="outline"
+                    onClick={() => onDeletePhoto(photo)}
+                    disabled={deletingPhotoId === photo.id}
+                  >
+                    {deletingPhotoId === photo.id
+                      ? "Deleting..."
+                      : "Delete Photo"}
+                  </Button>
+                )}
               </div>
             </div>
           ))}

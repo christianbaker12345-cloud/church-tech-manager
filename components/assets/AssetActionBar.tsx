@@ -9,6 +9,7 @@ type AssetActionBarProps = {
   onShowCheckoutForm: () => void;
   onCheckIn: () => void;
   onPrintQRCode: () => void;
+  canManage: boolean;
 };
 
 export default function AssetActionBar({
@@ -19,6 +20,7 @@ export default function AssetActionBar({
   onShowCheckoutForm,
   onCheckIn,
   onPrintQRCode,
+  canManage,
 }: AssetActionBarProps) {
   return (
     <section className="mt-10 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm md:p-8">
@@ -32,34 +34,40 @@ export default function AssetActionBar({
         </h2>
 
         <p className="mt-2 text-slate-500">
-          Manage this asset throughout its lifecycle.
+          {canManage
+            ? "Manage this asset throughout its lifecycle."
+            : "View asset tools available to your account."}
         </p>
       </div>
 
       <div className="mt-8 grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+        {canManage && (
+          <>
         <ActionCard
-          icon="✏️"
-          title="Edit"
-          description="Update equipment information."
-        >
-          <Link href={`/assets/${assetId}/edit`}>
-            <Button className="w-full">Edit Equipment</Button>
-          </Link>
-        </ActionCard>
+            icon="✏️"
+            title="Edit"
+            description="Update equipment information."
+          >
+            <Link href={`/assets/${assetId}/edit`}>
+              <Button className="w-full">Edit Equipment</Button>
+            </Link>
+          </ActionCard>
+  
+          <ActionCard
+            icon="🔧"
+            title="Maintenance"
+            description="Open a repair or maintenance request."
+          >
+            <Link href={`/assets/${assetId}/maintenance`}>
+              <Button className="w-full" variant="outline">
+                Report Issue
+              </Button>
+            </Link>
+          </ActionCard>
+          </>
+        )}
 
-        <ActionCard
-          icon="🔧"
-          title="Maintenance"
-          description="Open a repair or maintenance request."
-        >
-          <Link href={`/assets/${assetId}/maintenance`}>
-            <Button className="w-full" variant="outline">
-              Report Issue
-            </Button>
-          </Link>
-        </ActionCard>
-
-        {isAvailable && (
+        {canManage && isAvailable && (
           <ActionCard
             icon="🚚"
             title="Transfer"
@@ -74,7 +82,7 @@ export default function AssetActionBar({
           </ActionCard>
         )}
 
-        {isCheckedOut && (
+        {canManage && isCheckedOut && (
           <ActionCard
             icon="🔄"
             title="Return"

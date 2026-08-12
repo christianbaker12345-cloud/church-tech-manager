@@ -8,6 +8,8 @@ import { Archive, Check, Pencil, RotateCcw, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/lib/supabase";
 
+type UserRole = "Admin" | "Staff" | "Volunteer";
+
 type Equipment = {
   id: string;
   name: string;
@@ -61,6 +63,10 @@ export default function EquipmentDetailsPage() {
   const [item, setItem] = useState<Equipment | null>(null);
   const [assets, setAssets] = useState<Asset[]>([]);
 
+  const [accessChecking, setAccessChecking] = useState(true);
+  const [currentUserRole, setCurrentUserRole] =
+    useState<UserRole>("Volunteer");
+
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
 
@@ -95,9 +101,56 @@ export default function EquipmentDetailsPage() {
 
   useEffect(() => {
     if (equipmentId) {
-      loadPage();
+      initializePage();
     }
   }, [equipmentId]);
+
+  const canManage =
+    currentUserRole === "Admin" || currentUserRole === "Staff";
+
+  async function initializePage() {
+    setAccessChecking(true);
+
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser();
+
+    if (userError || !user) {
+      setCurrentUserRole("Volunteer");
+      await loadPage();
+      setAccessChecking(false);
+      return;
+    }
+
+    const { data: profile, error: profileError } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", user.id)
+      .maybeSingle();
+
+    if (profileError) {
+      console.error(
+        "Unable to verify equipment-detail access:",
+        profileError
+      );
+      setCurrentUserRole("Volunteer");
+      await loadPage();
+      setAccessChecking(false);
+      return;
+    }
+
+    const role: UserRole =
+      profile?.role === "Admin"
+        ? "Admin"
+        : profile?.role === "Staff"
+          ? "Staff"
+          : "Volunteer";
+
+    setCurrentUserRole(role);
+    await loadPage();
+    setAccessChecking(false);
+  }
 
   async function loadPage() {
     if (!equipmentId) return;
@@ -198,6 +251,11 @@ export default function EquipmentDetailsPage() {
   }
 
   async function createMissingAssets() {
+    if (!canManage) {
+      alert("You do not have permission to create individual assets.")
+      return;
+    }
+
     if (!item) return;
 
     const quantity = Math.max(Number(item.quantity) || 0, 0);
@@ -264,6 +322,11 @@ export default function EquipmentDetailsPage() {
   }
 
   async function checkOutEquipmentRecord() {
+    if (!canManage) {
+      alert("You do not have permission to check out equipment.")
+      return;
+    }
+
     if (!item || !equipmentId) return;
 
     if (!checkedOutBy.trim()) {
@@ -345,6 +408,11 @@ export default function EquipmentDetailsPage() {
   }
 
   async function checkInEquipmentRecord() {
+    if (!canManage) {
+      alert("You do not have permission to check in equipment.")
+      return;
+    }
+
     if (!item || !equipmentId) return;
 
     const confirmed = window.confirm(
@@ -410,6 +478,7 @@ export default function EquipmentDetailsPage() {
   }
 
   function beginInlineEdit(field: EditableEquipmentField) {
+    if (!canManage) return;
     if (!item) return;
 
     const currentValue =
@@ -429,6 +498,11 @@ export default function EquipmentDetailsPage() {
   }
 
   async function saveInlineField(field: EditableEquipmentField) {
+    if (!canManage) {
+      alert("You do not have permission to edit equipment.")
+      return;
+    }
+
     if (!item || !equipmentId) return;
 
     setInlineEditError("");
@@ -494,6 +568,11 @@ export default function EquipmentDetailsPage() {
   }
 
   async function retireEquipment() {
+    if (!canManage) {
+      alert("You do not have permission to retire equipment.")
+      return;
+    }
+
     if (!item || !equipmentId) return;
 
     if (!retireReason) {
@@ -551,6 +630,11 @@ export default function EquipmentDetailsPage() {
   }
 
   async function moveEquipmentToTrash() {
+    if (!canManage) {
+      alert("You do not have permission to move equipment to Trash.")
+      return;
+    }
+
     if (!item || !equipmentId) return;
 
     if (!trashReason.trim()) {
@@ -610,6 +694,11 @@ export default function EquipmentDetailsPage() {
   }
 
   async function restoreRetiredEquipment() {
+    if (!canManage) {
+      alert("You do not have permission to restore equipment.")
+      return;
+    }
+
     if (!item || !equipmentId) return;
 
     const confirmed = window.confirm(
@@ -660,6 +749,11 @@ export default function EquipmentDetailsPage() {
   }
 
   async function restoreEquipmentFromTrash() {
+    if (!canManage) {
+      alert("You do not have permission to restore equipment from Trash.")
+      return;
+    }
+
     if (!item || !equipmentId) return;
 
     const confirmed = window.confirm(
@@ -725,6 +819,16 @@ export default function EquipmentDetailsPage() {
 
   function printQRCode() {
     window.print();
+  }
+
+  if (accessChecking) {
+    return (
+      <div className="p-8">
+        <h1 className="text-3xl font-bold">
+          Verifying permissions...
+        </h1>
+      </div>
+    );
   }
 
   if (loading) {
@@ -870,7 +974,7 @@ export default function EquipmentDetailsPage() {
                 </div>
               )}
 
-              {!item.trashed_at && (
+              {canManage && !item.trashed_at && (
                 <div className="mt-5">
                   <Button
                     variant="outline"
@@ -921,19 +1025,21 @@ export default function EquipmentDetailsPage() {
                 </div>
               </div>
 
-              <div className="mt-5">
-                <Button
-                  variant="outline"
-                  onClick={restoreEquipmentFromTrash}
+              {canManage && (
+                <div className="mt-5">
+                  <Button
+                    variant="outline"
+                    onClick={restoreEquipmentFromTrash}
                   disabled={restoringTrash}
                   className="border-rose-300 bg-white text-rose-700 hover:bg-rose-100 hover:text-rose-900"
                 >
                   <RotateCcw className="h-4 w-4" />
-                  {restoringTrash
-                    ? "Restoring..."
-                    : "Restore from Trash"}
-                </Button>
-              </div>
+                    {restoringTrash
+                      ? "Restoring..."
+                      : "Restore from Trash"}
+                  </Button>
+                </div>
+              )}
             </div>
           )}
 
@@ -987,6 +1093,17 @@ export default function EquipmentDetailsPage() {
             </div>
           )}
 
+          {!canManage && (
+            <div className="mt-8 rounded-xl border border-amber-200 bg-amber-50 p-5">
+              <p className="text-sm font-bold uppercase tracking-[0.16em] text-amber-700">
+                Volunteer Access
+              </p>
+              <p className="mt-2 text-slate-700">
+                This equipment record is read-only for your account.
+              </p>
+            </div>
+          )}
+
           {inlineEditError && (
             <div className="mt-8 rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm font-medium text-rose-700">
               {inlineEditError}
@@ -996,6 +1113,7 @@ export default function EquipmentDetailsPage() {
           <div className="mt-10 grid gap-6 md:grid-cols-2">
             <EditableEquipmentCard
               label="Category"
+              readOnly={!canManage}
               value={item.category || "—"}
               field="category"
               inputType="text"
@@ -1011,6 +1129,7 @@ export default function EquipmentDetailsPage() {
 
             <EditableEquipmentCard
               label="Quantity"
+              readOnly={!canManage}
               value={String(quantity)}
               field="quantity"
               inputType="number"
@@ -1026,6 +1145,7 @@ export default function EquipmentDetailsPage() {
 
             <EditableEquipmentCard
               label="Location"
+              readOnly={!canManage}
               value={item.location || "—"}
               field="location"
               inputType="text"
@@ -1056,6 +1176,7 @@ export default function EquipmentDetailsPage() {
 
           <EditableNotesCard
             value={item.notes || "No notes available."}
+            readOnly={!canManage}
             editing={editingField === "notes"}
             saving={savingField === "notes"}
             draftValue={draftValue}
@@ -1066,9 +1187,11 @@ export default function EquipmentDetailsPage() {
           />
 
           <div className="mt-8 flex flex-wrap gap-4">
-            <Link href={`/inventory/${item.id}/edit`}>
-              <Button>Edit Equipment</Button>
-            </Link>
+            {canManage && (
+              <Link href={`/inventory/${item.id}/edit`}>
+                <Button>Edit Equipment</Button>
+              </Link>
+            )}
 
             <Link href={`/inventory/${item.id}/history`}>
               <Button variant="outline">
@@ -1076,7 +1199,7 @@ export default function EquipmentDetailsPage() {
               </Button>
             </Link>
 
-            {equipmentIsAvailable && (
+            {canManage && equipmentIsAvailable && (
               <Button
                 onClick={() =>
                   setShowCheckoutForm(true)
@@ -1086,7 +1209,7 @@ export default function EquipmentDetailsPage() {
               </Button>
             )}
 
-            {equipmentIsCheckedOut && (
+            {canManage && equipmentIsCheckedOut && (
               <Button
                 onClick={checkInEquipmentRecord}
                 disabled={checkingIn}
@@ -1104,7 +1227,7 @@ export default function EquipmentDetailsPage() {
               Print QR Code
             </Button>
 
-            {!item.retired_at && !item.trashed_at && (
+            {canManage && !item.retired_at && !item.trashed_at && (
               <Button
                 variant="outline"
                 onClick={() => setShowRetireDialog(true)}
@@ -1114,7 +1237,7 @@ export default function EquipmentDetailsPage() {
               </Button>
             )}
 
-            {!item.trashed_at && (
+            {canManage && !item.trashed_at && (
               <Button
                 variant="outline"
                 onClick={() => setShowTrashDialog(true)}
@@ -1131,7 +1254,7 @@ export default function EquipmentDetailsPage() {
             buttons on their asset pages.
           </p>
 
-          {showCheckoutForm && equipmentIsAvailable && (
+          {canManage && showCheckoutForm && equipmentIsAvailable && (
             <div className="mt-8 rounded-xl border bg-gray-50 p-6">
               <div className="flex items-center justify-between gap-4">
                 <div>
@@ -1239,7 +1362,7 @@ export default function EquipmentDetailsPage() {
         </div>
       </div>
 
-      {showRetireDialog && (
+      {canManage && showRetireDialog && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 p-4 backdrop-blur-sm">
           <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-3xl bg-white shadow-2xl">
             <div className="border-b border-slate-200 bg-slate-50 p-6 md:p-8">
@@ -1350,7 +1473,7 @@ export default function EquipmentDetailsPage() {
         </div>
       )}
 
-      {showTrashDialog && (
+      {canManage && showTrashDialog && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 p-4 backdrop-blur-sm">
           <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-3xl bg-white shadow-2xl">
             <div className="border-b border-rose-200 bg-rose-50 p-6 md:p-8">
@@ -1443,22 +1566,24 @@ export default function EquipmentDetailsPage() {
             </p>
           </div>
 
-          <Button
-            onClick={createMissingAssets}
-            disabled={
-              creatingAssets || missingAssetCount === 0
-            }
-          >
-            {creatingAssets
-              ? "Creating Assets..."
-              : missingAssetCount > 0
-                ? `Create ${missingAssetCount} Missing ${
-                    missingAssetCount === 1
-                      ? "Asset"
-                      : "Assets"
-                  }`
-                : "All Assets Created"}
-          </Button>
+          {canManage && (
+            <Button
+              onClick={createMissingAssets}
+              disabled={
+                creatingAssets || missingAssetCount === 0
+              }
+            >
+              {creatingAssets
+                ? "Creating Assets..."
+                : missingAssetCount > 0
+                  ? `Create ${missingAssetCount} Missing ${
+                      missingAssetCount === 1
+                        ? "Asset"
+                        : "Assets"
+                    }`
+                  : "All Assets Created"}
+            </Button>
+          )}
         </div>
 
         {assets.length > quantity && (
@@ -1565,6 +1690,7 @@ export default function EquipmentDetailsPage() {
 
 type EditableEquipmentCardProps = {
   label: string;
+  readOnly: boolean;
   value: string;
   field: EditableEquipmentField;
   inputType: "text" | "number";
@@ -1580,6 +1706,7 @@ type EditableEquipmentCardProps = {
 
 function EditableEquipmentCard({
   label,
+  readOnly,
   value,
   field,
   inputType,
@@ -1592,6 +1719,22 @@ function EditableEquipmentCard({
   onSave,
   onCancel,
 }: EditableEquipmentCardProps) {
+  if (readOnly) {
+    return (
+      <div className="rounded-xl border border-slate-200 bg-slate-50 p-5">
+        <p className="text-sm text-gray-500">
+          {label}
+        </p>
+        <p className="mt-1 break-words text-xl font-semibold">
+          {value}
+        </p>
+        <p className="mt-3 text-xs font-medium text-slate-400">
+          Read only
+        </p>
+      </div>
+    );
+  }
+
   if (editing) {
     return (
       <div className="rounded-xl border border-blue-300 bg-blue-50 p-5 ring-4 ring-blue-100">
@@ -1679,6 +1822,7 @@ function EditableEquipmentCard({
 
 type EditableNotesCardProps = {
   value: string;
+  readOnly: boolean;
   editing: boolean;
   saving: boolean;
   draftValue: string;
@@ -1690,6 +1834,7 @@ type EditableNotesCardProps = {
 
 function EditableNotesCard({
   value,
+  readOnly,
   editing,
   saving,
   draftValue,
@@ -1698,6 +1843,26 @@ function EditableNotesCard({
   onSave,
   onCancel,
 }: EditableNotesCardProps) {
+  if (readOnly) {
+    return (
+      <div className="mt-8 w-full rounded-xl border border-slate-200 bg-slate-50 p-6">
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-xl font-bold">
+            Notes
+          </h2>
+
+          <span className="rounded-full bg-slate-200 px-2.5 py-1 text-xs font-bold text-slate-600">
+            Read only
+          </span>
+        </div>
+
+        <p className="mt-3 whitespace-pre-wrap text-gray-700">
+          {value}
+        </p>
+      </div>
+    );
+  }
+
   if (editing) {
     return (
       <div className="mt-8 rounded-xl border border-blue-300 bg-blue-50 p-6 ring-4 ring-blue-100">

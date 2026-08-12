@@ -12,8 +12,9 @@ import CheckoutHistory, {
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import { Button } from "@/components/ui/button";
 import { supabase } from "@/lib/supabase";
+
+type UserRole = "Admin" | "Staff" | "Volunteer";
 
 type Asset = {
   id: string;
@@ -26,6 +27,9 @@ type Asset = {
   purchase_date: string | null;
   purchase_price: number | null;
   warranty_expires: string | null;
+  manufacturer: string | null;
+  model: string | null;
+  condition: string | null;
   notes: string | null;
   created_at: string | null;
   checked_out_by: string | null;
@@ -64,6 +68,9 @@ export default function AssetDetailsPage() {
     AssetCheckoutHistory[]
   >([]);
 
+  const [accessChecking, setAccessChecking] = useState(true);
+  const [currentUserRole, setCurrentUserRole] =
+    useState<UserRole>("Volunteer");
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
 
@@ -87,9 +94,55 @@ export default function AssetDetailsPage() {
 
   useEffect(() => {
     if (assetId) {
-      loadPage();
+      initializePage();
     }
   }, [assetId]);
+
+  async function initializePage() {
+    setAccessChecking(true);
+
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser();
+
+    if (userError || !user) {
+      setCurrentUserRole("Volunteer");
+      await loadPage();
+      setAccessChecking(false);
+      return;
+    }
+
+    const { data: profile, error: profileError } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", user.id)
+      .maybeSingle();
+
+    if (profileError) {
+      console.error("Unable to verify asset access:", profileError);
+      setCurrentUserRole("Volunteer");
+    } else {
+      const role: UserRole =
+        profile?.role === "Admin"
+          ? "Admin"
+          : profile?.role === "Staff"
+            ? "Staff"
+            : "Volunteer";
+
+      setCurrentUserRole(role);
+    }
+
+    await loadPage();
+    setAccessChecking(false);
+  }
+
+  function canManageAssets() {
+    return (
+      currentUserRole === "Admin" ||
+      currentUserRole === "Staff"
+    );
+  }
 
   async function loadPage() {
     if (!assetId) return;
@@ -252,6 +305,11 @@ export default function AssetDetailsPage() {
   }
 
   async function uploadAssetPhoto() {
+    if (!canManageAssets()) {
+      alert("You do not have permission to add asset photos.");
+      return;
+    }
+
     if (!asset || !assetId || !photoFile) {
       alert("Choose a photo first.");
       return;
@@ -328,6 +386,11 @@ export default function AssetDetailsPage() {
   }
 
   async function deleteAssetPhoto(photo: AssetPhoto) {
+    if (!canManageAssets()) {
+      alert("You do not have permission to delete asset photos.");
+      return;
+    }
+
     const confirmed = window.confirm(
       "Delete this photo permanently?"
     );
@@ -381,6 +444,11 @@ export default function AssetDetailsPage() {
   }
 
   async function checkOutAsset() {
+    if (!canManageAssets()) {
+      alert("You do not have permission to check out assets.");
+      return;
+    }
+
     if (!asset || !assetId) return;
 
     if (!checkedOutBy.trim()) {
@@ -482,6 +550,11 @@ export default function AssetDetailsPage() {
   }
 
   async function checkInAsset() {
+    if (!canManageAssets()) {
+      alert("You do not have permission to check in assets.");
+      return;
+    }
+
     if (!asset || !assetId) return;
 
     const name =
@@ -556,7 +629,7 @@ export default function AssetDetailsPage() {
     window.print();
   }
 
-  if (loading) {
+  if (accessChecking || loading) {
     return (
       <div className="p-8">
         <h1 className="text-3xl font-bold">
@@ -608,6 +681,8 @@ export default function AssetDetailsPage() {
       ? `${window.location.origin}/assets/${asset.id}`
       : "";
 
+  const canManage = canManageAssets();
+
   return (
     <div className="p-8">
       <Link
@@ -636,6 +711,7 @@ export default function AssetDetailsPage() {
             isCheckedOut={isCheckedOut}
             formatDate={formatDate}
             formatCurrency={formatCurrency}
+            canManage={canManage}
           />
 
           <AssetActionBar
@@ -646,6 +722,7 @@ export default function AssetDetailsPage() {
             onShowCheckoutForm={() => setShowCheckoutForm(true)}
             onCheckIn={checkInAsset}
             onPrintQRCode={printQRCode}
+            canManage={canManage}
           />
 
           {!isAvailable && !isCheckedOut && (
@@ -655,7 +732,7 @@ export default function AssetDetailsPage() {
             </p>
           )}
 
-          {showCheckoutForm && isAvailable && (
+          {canManage && showCheckoutForm && isAvailable && (
             <CheckoutDialog
               open={showCheckoutForm}
               displayName={displayName}
@@ -698,6 +775,7 @@ export default function AssetDetailsPage() {
         onPhotoCaptionChange={setPhotoCaption}
         onUploadPhoto={uploadAssetPhoto}
         onDeletePhoto={deleteAssetPhoto}
+        canManage={canManage}
       />
 
       <CheckoutHistory

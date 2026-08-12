@@ -32,6 +32,7 @@ type AssetInformationProps = {
   isCheckedOut: boolean;
   formatDate: (date: string | null) => string;
   formatCurrency: (value: number | null) => string;
+  canManage: boolean;
 };
 
 type EditableField =
@@ -57,6 +58,7 @@ export default function AssetInformation({
   isCheckedOut,
   formatDate,
   formatCurrency,
+  canManage,
 }: AssetInformationProps) {
   const [editingField, setEditingField] =
     useState<EditableField | null>(null);
@@ -93,6 +95,8 @@ export default function AssetInformation({
   }, [asset]);
 
   function beginEditing(field: EditableField) {
+    if (!canManage) return;
+
     setSaveError("");
     setEditingField(field);
   }
@@ -122,6 +126,11 @@ export default function AssetInformation({
   }
 
   async function saveField(field: EditableField) {
+    if (!canManage) {
+      setSaveError("You do not have permission to edit this asset.");
+      return;
+    }
+
     setSavingField(field);
     setSaveError("");
 
@@ -293,7 +302,9 @@ export default function AssetInformation({
           </h2>
 
           <p className="mt-2 text-slate-500">
-            Click an editable card to update its information.
+            {canManage
+              ? "Click an editable card to update its information."
+              : "Asset details and stewardship information."}
           </p>
         </div>
 
@@ -305,7 +316,7 @@ export default function AssetInformation({
 
         <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           {details.map((item) => {
-            if (!item.editable) {
+            if (!item.editable || !canManage) {
               return (
                 <InformationCard
                   key={item.label}
@@ -358,7 +369,7 @@ export default function AssetInformation({
             </div>
           </div>
 
-          {editingField !== "notes" && (
+          {canManage && editingField !== "notes" && (
             <Button
               variant="outline"
               onClick={() => beginEditing("notes")}
@@ -369,7 +380,7 @@ export default function AssetInformation({
           )}
         </div>
 
-        {editingField === "notes" ? (
+        {canManage && editingField === "notes" ? (
           <div className="mt-5">
             <textarea
               value={values.notes}
@@ -404,16 +415,25 @@ export default function AssetInformation({
             </div>
           </div>
         ) : (
-          <button
-            type="button"
-            onClick={() => beginEditing("notes")}
-            className="mt-5 w-full rounded-xl bg-slate-50 p-5 text-left transition hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-blue-100"
-          >
-            <p className="whitespace-pre-wrap leading-7 text-slate-700">
-              {values.notes ||
-                "No notes have been added for this equipment item."}
-            </p>
-          </button>
+          canManage ? (
+            <button
+              type="button"
+              onClick={() => beginEditing("notes")}
+              className="mt-5 w-full rounded-xl bg-slate-50 p-5 text-left transition hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-blue-100"
+            >
+              <p className="whitespace-pre-wrap leading-7 text-slate-700">
+                {values.notes ||
+                  "No notes have been added for this equipment item."}
+              </p>
+            </button>
+          ) : (
+            <div className="mt-5 w-full rounded-xl bg-slate-50 p-5 text-left">
+              <p className="whitespace-pre-wrap leading-7 text-slate-700">
+                {values.notes ||
+                  "No notes have been added for this equipment item."}
+              </p>
+            </div>
+          )
         )}
       </section>
     </div>
@@ -602,4 +622,4 @@ function AssignmentItem({
       </p>
     </div>
   );
-}
+} 
